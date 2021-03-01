@@ -1,0 +1,4 @@
+Log file created at: 2019/07/19 21:04:05
+Running on machine: sp
+Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+E0719 21:04:05.507709  2737 MVCAMAPI.cpp:309] CameraInit Failed, err:-18,Version:2.1.0.3,FriendlyName:MV-SUA134GC#0,SN:049060610008
