@@ -16,6 +16,7 @@
 #include "google/protobuf/wrappers.pb.h"
 #include "tensorflow/core/util/command_line_flags.h"
 #include <ros/ros.h>
+#include <roborts_msgs/GimbalAngle.h>
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
 using tensorflow::string;
@@ -24,10 +25,12 @@ using tensorflow::Tensor;
 using namespace tensorflow;
 
 /*模型路径*/
-const string model_path = "/home/cmq/ljn/AI2021/attack/src/tjsp_attack_2020/Model/happyModel.pb";
+const string model_path = "/home/icra01/icra/src/tzgj-attack/tjsp_attack_2020/Model/happyModel.pb";
 /*输入输出节点详见ipynb的summary*/
 const string input_name = "input_1:0";
 const string output_name = "y/Sigmoid:0";
+
+
 
 namespace armor
 {
@@ -519,6 +522,16 @@ namespace armor
             }
         }
 
+        void gimbal_excute(ros::Publisher& gimbalPub,double pitch,double yaw)
+        {
+            roborts_msgs::GimbalAngle gimbalAngle;
+            gimbalAngle.yaw_mode = 0;
+            gimbalAngle.pitch_mode = 0;
+            gimbalAngle.yaw_angle = yaw;
+            gimbalAngle.pitch_angle = pitch;
+            gimbalPub.publish(gimbalAngle);
+        }
+
         /**
          * @name run
          * @param src 彩图
@@ -528,7 +541,7 @@ namespace armor
          * @func 主运行函数
          * @return true
          */
-        bool run(cv::Mat &src, int64_t timeStamp, float gYaw, float gPitch,ros::Publisher& resultPub)
+        bool run(cv::Mat &src, int64_t timeStamp, double gYaw, double gPitch,ros::Publisher& resultPub,ros::Publisher& gimbalPub)
         {
             /* 1.初始化参数，判断是否启用ROI */
             m_bgr_raw = src;
@@ -555,8 +568,8 @@ namespace armor
 
 
             s_latestTimeStamp.exchange(timeStamp);
-            float rYaw = 0.0;
-            float rPitch = 0.0;
+            double rYaw = 0.0;
+            double rPitch = 0.0;
             /* 获得云台全局欧拉角 */
             // m_communicator.getGlobalAngle(&gYaw, &gPitch);
             /* 计算世界坐标参数，转换到世界坐标系 */
@@ -583,12 +596,12 @@ namespace armor
                         s_historyTargets[0].convert2WorldPts(-gYaw, gPitch);
                         cout << "s_historyTargets[0].ptsInGimbal : " << s_historyTargets[0].ptsInGimbal << endl;
                         /* 卡尔曼滤波初始化/参数修正 */
-                        if (s_historyTargets.size() == 1)
-                            kalman.clear_and_init(s_historyTargets[0].ptsInWorld, timeStamp);
-                        else
-                        {
-                            kalman.correct(s_historyTargets[0].ptsInWorld, timeStamp);
-                        }
+                        // if (s_historyTargets.size() == 1)
+                        //     kalman.clear_and_init(s_historyTargets[0].ptsInWorld, timeStamp);
+                        // else
+                        // {
+                        //     kalman.correct(s_historyTargets[0].ptsInWorld, timeStamp);
+                        // }
                     }
                     m_is.addText(cv::format("inWorld.x %.0f", s_historyTargets[0].ptsInWorld.x));
                     m_is.addText(cv::format("inWorld.y %.0f", s_historyTargets[0].ptsInWorld.y));
@@ -619,6 +632,7 @@ namespace armor
                 s_historyTargets[0].correctTrajectory_and_calcEuler();
                 DEBUG("correctTrajectory_and_calcEuler end")
                 rYaw = s_historyTargets[0].rYaw;
+                rYaw=-rYaw;
                 rPitch = s_historyTargets[0].rPitch;
                 /* 7.射击策略 */
                 if (s_historyTargets.size() >= 3 &&
@@ -630,22 +644,26 @@ namespace armor
                                         s_historyTargets[0].ptsInGimbal.x / 1000.0,
                                         s_historyTargets[0].ptsInGimbal.y / 1000.0,
                                         s_historyTargets[0].ptsInGimbal.z / 1000.0));
-                m_is.addText(cv::format("rPitch %.3f", rPitch));
-                m_is.addText(cv::format("rYaw   %.3f", rYaw));
-                m_is.addText(cv::format("gYaw   %.3f", gYaw));
-                m_is.addText(cv::format("rYaw + gYaw   %.3f", rYaw - gYaw));
+                m_is.addText(cv::format("rPitch %.3f", rPitch* M_PI / (180.0)));
+                m_is.addText(cv::format("rYaw   %.3f", rYaw* M_PI / (180.0)));
+                m_is.addText(cv::format("gYaw   %.3f", gYaw* M_PI / (180.0)));
+                m_is.addText(cv::format("rYaw + gYaw   %.3f", (rYaw - gYaw)* M_PI / (180.0)));
             }
             /* 8.通过PID对yaw进行修正（参数未修改） */
+            
             float newYaw = rYaw;
             if (cv::abs(rYaw) < 5)
                 newYaw = m_pid.calc(rYaw, timeStamp);
             else
                 m_pid.clear();
-            m_is.addText(cv::format("newYaw %3.3f", newYaw));
-            m_is.addText(cv::format("delta yaw %3.3f", newYaw - rYaw));
+            m_is.addText(cv::format("newYaw %3.3f", newYaw* M_PI / (180.0)));
+            m_is.addText(cv::format("delta yaw %3.3f", (newYaw - rYaw)* M_PI / (180.0)));
             newYaw = cv::abs(newYaw) < 0.3 ? rYaw : newYaw;
+            newYaw=newYaw* M_PI / (180.0);
+            rPitch=rPitch* M_PI / (180.0);
             sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
             resultPub.publish(*msg);
+            gimbal_excute(gimbalPub,rPitch,newYaw);
             /* 9.发给电控 */
             // m_communicator.send(newYaw, rPitch, statusA, SEND_STATUS_WM_PLACEHOLDER);
             //  PRINT_INFO("[attack] send = %ld", timeStamp);

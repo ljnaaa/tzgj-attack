@@ -8,6 +8,7 @@
 #include <cmath>
 #include <toml.h>
 #include <unistd.h>
+#include <boost/array.hpp>
 #include "semaphore.hpp"
 //#include "capture.hpp"
 
@@ -52,7 +53,7 @@ namespace armor
         {
             /* parse config.toml */
             std::cout<<getcwd(NULL,0)<<std::endl;
-            std::ifstream ifs("src/tjsp_attack_2020/config.toml");
+            std::ifstream ifs("src/tzgj-attack/tjsp_attack_2020/config.toml");
             toml::ParseResult pr = toml::parse(ifs);
             ifs.close();
             if (!pr.valid())
@@ -90,6 +91,7 @@ namespace armor
         cv::Mat distCoeffs;
         cv::Mat m_ABC_x, m_ABC_y;
 
+        bool cameraInfo_set = false;
         bool isTest = false;
         bool isLinear = false;
         /**
@@ -135,12 +137,12 @@ namespace armor
          */
         explicit Camera(const cv::String &path)
         {
-            /* 读取相机标定文件 */
-            cv::FileStorage fs(path, cv::FileStorage::READ);
-            cv::read(fs["camera_matrix"], camMat);
-            cv::read(fs["distortion_coefficients"], distCoeffs);
-            fs.release();
-
+            // /* 读取相机标定文件 */
+            // cv::FileStorage fs(path, cv::FileStorage::READ);
+            // cv::read(fs["camera_matrix"], camMat);
+            // cv::read(fs["distortion_coefficients"], distCoeffs);
+            // fs.release();
+            // std::cout<<"camera_info:"<<std::endl<<camMat<<std::endl<<distCoeffs<<std::endl;
             /* 初始化弹道参数 */
             std::deque<cv::Point2f> disToY;
             for (auto &_pts : armor::stConfig.get<toml::Array>("curve.dy"))
@@ -163,6 +165,33 @@ namespace armor
             curveFit(disToX, 2, m_ABC_x);
             isTest = stConfig.get<bool>("curve.test-shoot");
         }
+
+        void SetCameraInfo(const boost::array<double,9>& camera_matrix,const std::vector<double>& distortion_coefficients)
+        {
+
+            if(!cameraInfo_set)
+            {
+                camMat.create(3,3,CV_64FC1);
+                for(int i=0;i<9;i++)
+                {
+                    camMat.at<double>(i/3,i%3) = camera_matrix[i];
+                }
+                distCoeffs.create(1,5,CV_64FC1);
+                for(int i=0;i<5;i++)
+                {
+                    distCoeffs.at<double>(0,i) = distortion_coefficients[i];
+                }
+                cameraInfo_set = true;
+            }
+        //     for(int i=0;i<9;i++)
+        //     {
+        //         std::cout<<camMat.at<double>(i/3,i%3)<<"  ";
+        //     }
+        //     std::cout<<std::endl;
+        // 
+        }
+
+
 
         /**
          * @name curveFit
@@ -229,7 +258,7 @@ namespace armor
                 newPts.z = pts.z;
             }
         }
-    } stCamera("/home/cmq/ljn/AI2021/Old_Code/data/camera6mm.xml");
+    } stCamera("/home/icra01/icra/src/tjsp_attack_2020/data/camera6mm.xml");
 
     // TODO: 测量, 实际检测灯长度不是55mm
     /**
@@ -552,7 +581,7 @@ namespace armor
                                      0, 0, 1, 0, 0, 1,
                                      0, 0, 0, 1, 0, 0,
                                      0, 0, 0, 0, 1, 0,
-                                     0, 0, 0, 0, 0, 1);
+                                0, 0, 0, 0, 0, 1);
             setIdentity(m_kf.measurementMatrix);                            //观测模型
             setIdentity(m_kf.processNoiseCov, cv::Scalar::all(1e-5));       //过程噪声
             setIdentity(m_kf.measurementNoiseCov, cv::Scalar::all(1e-1));   //观测噪声
