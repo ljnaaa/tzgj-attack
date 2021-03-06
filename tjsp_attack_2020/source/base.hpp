@@ -273,7 +273,7 @@ namespace armor
             cv::Point3d(0, 0, 0), cv::Point3d(0, -55, 0), cv::Point3d(230, -55, 0), cv::Point3d(230, 0, 0)};
         // 扩展区域
         std::vector<cv::Point2f> smallFig_Ex = {
-            cv::Point2f(0, 0), cv::Point2f(0, 126), cv::Point2f(135, 126), cv::Point2f(135, 0)};
+            cv::Point2f(0, 0), cv::Point2f(0, 126), cv::Point2f(140, 126), cv::Point2f(140, 0)};
         std::vector<cv::Point2f> largeFig_Ex = {
             cv::Point2f(0, 0), cv::Point2f(0, 126), cv::Point2f(230, 126), cv::Point2f(230, 0)};
         cv::Mat smallShootPosition = cv::Mat(cv::Point3d(67.5, -27.5, 0.0));
@@ -383,7 +383,12 @@ namespace armor
             for (int i = 0; i < 4; ++i)
             {
                 gPixelPts2f[i] = cv::Point2d(pixelPts2f[i]) + cv::Point2d(stFrameInfo.offset);
+                // std::cout<<pixelPts2f[i].x<<" "<<pixelPts2f[i].y<<" ";
+                // std::cout<<gPixelPts2f[i].x<<" "<<gPixelPts2f[i].y<<' ';
+
+            
             }
+            std::cout<<std::endl;
             CV_Assert(!stCamera.camMat.empty());
 
             // 存在两种尺寸装甲板
@@ -422,7 +427,7 @@ namespace armor
          */
         void convert2WorldPts(float gYaw_, float gPitch_)
         {
-            //单位转换，弧度转度
+            //单位转换，度转弧度
             gYaw_ = gYaw_ * M_PI / (180.0);
             gPitch_ = gPitch_ * M_PI / (180.0);
 
@@ -434,18 +439,19 @@ namespace armor
                       -std::sin(gYaw_), 0, std::cos(gYaw_));
 
             /* pitch 为绕x轴旋转的 */
-            m_rotX = (cv::Mat_<double>(3, 3)
-                          << 1,
-                      0, 0,
-                      0, std::cos(gPitch_), -std::sin(gPitch_),
-                      0, std::sin(gPitch_), std::cos(gPitch_));
+            // m_rotX = (cv::Mat_<double>(3, 3)
+            //               << 1,
+            //           0, 0,
+            //           0, std::cos(gPitch_), -std::sin(gPitch_),
+            //           0, std::sin(gPitch_), std::cos(gPitch_));
 
             /* 先绕动系y轴旋转, 再绕动系x轴旋转 */
             cv::Mat _pts = (cv::Mat_<double>(3, 1) << ptsInGimbal.x, ptsInGimbal.y, ptsInGimbal.z);
-            cv::Mat ptsInWorldMat = m_rotY * m_rotX * _pts;
+            cv::Mat ptsInWorldMat = m_rotY * _pts;
             ptsInWorld.x = ptsInWorldMat.at<double>(0);
             ptsInWorld.y = ptsInWorldMat.at<double>(1);
             ptsInWorld.z = ptsInWorldMat.at<double>(2);
+
 
             DEBUG("convert2WorldPts end")
         }
@@ -481,10 +487,10 @@ namespace armor
         void correctTrajectory_and_calcEuler()
         {
             /* 弹道修正, TODO */
-            stCamera.correctTrajectory(ptsInGimbal, ptsInShoot); //重力补偿修正
+            // stCamera.correctTrajectory(ptsInGimbal, ptsInShoot); //重力补偿修正
             DEBUG("stCamera.correctTrajectory")
             /* 计算欧拉角 */
-            Camera::convertPts2Euler(ptsInShoot, &rYaw, &rPitch); //计算Pitch,Yaw传递给电控
+            Camera::convertPts2Euler(ptsInGimbal, &rYaw, &rPitch); //计算Pitch,Yaw传递给电控
             DEBUG("Camera::convertPts2Euler")
         }
     }; // end struct Target

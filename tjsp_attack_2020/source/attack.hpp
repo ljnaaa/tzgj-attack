@@ -19,6 +19,8 @@
 #include <roborts_msgs/GimbalAngle.h>
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
+#include <tf/transform_listener.h>
+
 // 2021.3.5
 using tensorflow::string;
 using tensorflow::Tensor;
@@ -80,6 +82,7 @@ namespace armor
         PID &m_pid;                 // PID
         bool m_isUseDialte;         // 是否膨胀
         bool mode;                  // 红蓝模式
+        tf::TransformListener* listener;
 
     public:
         explicit Attack(ImageShowClient &isClient, PID &pid) : m_pid(pid),
@@ -88,6 +91,7 @@ namespace armor
         {
             mycnn::loadWeights("../info/dumpe2.nnet");
             m_isUseDialte = stConfig.get<bool>("auto.is-dilate");
+            listener = new tf::TransformListener;
         }
         void setMode(bool colorMode) { mode = colorMode; }
 
@@ -533,6 +537,25 @@ namespace armor
             gimbalPub.publish(gimbalAngle);
         }
 
+        void get_gimbal(double& pitch,double& yaw)
+        {
+            
+            tf::StampedTransform transform;
+            try{
+            listener->lookupTransform("/base_link", "/gimbal",
+                                    ros::Time(0), transform);
+            double roll;
+
+            tf::Matrix3x3(transform.getRotation()).getRPY(roll,pitch,yaw);
+            yaw = yaw/3.14159265*180.0;
+            pitch = pitch/3.14159265*180.0;
+            }
+            catch (tf::TransformException &ex) {
+            ROS_ERROR("%s",ex.what());
+            return ;
+            }
+        }
+
         /**
          * @name run
          * @param src 彩图
@@ -564,7 +587,7 @@ namespace armor
 
             /* 3.通过分类器 */
             m_is.clock("m_classify");
-            m_classify_single_tensor(0); 
+            m_classify_single_tensor(1); 
             m_is.clock("m_classify");
 
 
@@ -593,16 +616,17 @@ namespace armor
                     cout << "m_isEnablePredict start !" << endl;
                     if (statusA == SEND_STATUS_AUTO_AIM)
                     {   /* 获取世界坐标点 */
+                        get_gimbal(gPitch,gYaw);
                         // m_communicator.getGlobalAngle(&gYaw, &gPitch);
                         s_historyTargets[0].convert2WorldPts(-gYaw, gPitch);
-                        cout << "s_historyTargets[0].ptsInGimbal : " << s_historyTargets[0].ptsInGimbal << endl;
+                        cout << "s_historyTargets[0].ptsInGimbal : " << s_historyTargets[0].ptsInWorld << endl;
                         /* 卡尔曼滤波初始化/参数修正 */
-                        // if (s_historyTargets.size() == 1)
-                        //     kalman.clear_and_init(s_historyTargets[0].ptsInWorld, timeStamp);
-                        // else
-                        // {
-                        //     kalman.correct(s_historyTargets[0].ptsInWorld, timeStamp);
-                        // }
+                        if (s_historyTargets.size() == 1)
+                            kalman.clear_and_init(s_historyTargets[0].ptsInWorld, timeStamp);
+                        else
+                        {
+                            kalman.correct(s_historyTargets[0].ptsInWorld, timeStamp);
+                        }
                     }
                     m_is.addText(cv::format("inWorld.x %.0f", s_historyTargets[0].ptsInWorld.x));
                     m_is.addText(cv::format("inWorld.y %.0f", s_historyTargets[0].ptsInWorld.y));
@@ -628,6 +652,19 @@ namespace armor
                     }
                 }
 
+
+                if(statusA != SEND_STATUS_AUTO_AIM)
+                {
+                    sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
+
+                    resultPub.publish(*msg);
+                    return false;
+                }
+                        // m_communicator.getGlobalAngle(&gYaw, &gPitch);
+                s_historyTargets[0].convert2WorldPts(-gYaw, gPitch);
+                    // m_is.addText(cv::format("inWorld.x %.0f", s_historyTargets[0].ptsInWorld.x));
+                    // m_is.addText(cv::format("inWorld.y %.0f", s_historyTargets[0].ptsInWorld.y));
+                    // m_is.addText(cv::format("inWorld.z %.0f", s_historyTargets[0].ptsInWorld.z));
                 /* 6.修正弹道并计算欧拉角 */
                 DEBUG("correctTrajectory_and_calcEuler start")
                 s_historyTargets[0].correctTrajectory_and_calcEuler();
@@ -648,23 +685,29 @@ namespace armor
                 m_is.addText(cv::format("rPitch %.3f", rPitch* M_PI / (180.0)));
                 m_is.addText(cv::format("rYaw   %.3f", rYaw* M_PI / (180.0)));
                 m_is.addText(cv::format("gYaw   %.3f", gYaw* M_PI / (180.0)));
-                m_is.addText(cv::format("rYaw + gYaw   %.3f", (rYaw - gYaw)* M_PI / (180.0)));
+                m_is.addText(cv::format("rYaw + gYaw   %.3f", (rYaw + gYaw)* M_PI / (180.0)));
             }
             /* 8.通过PID对yaw进行修正（参数未修改） */
             
-            float newYaw = rYaw;
-            if (cv::abs(rYaw) < 5)
-                newYaw = m_pid.calc(rYaw, timeStamp);
-            else
-                m_pid.clear();
-            m_is.addText(cv::format("newYaw %3.3f", newYaw* M_PI / (180.0)));
-            m_is.addText(cv::format("delta yaw %3.3f", (newYaw - rYaw)* M_PI / (180.0)));
-            newYaw = cv::abs(newYaw) < 0.3 ? rYaw : newYaw;
-            newYaw=newYaw* M_PI / (180.0);
+            // float newYaw = rYaw;
+            // if (cv::abs(rYaw) < 5)
+            //     newYaw = m_pid.calc(rYaw, timeStamp);
+            // else
+            //     m_pid.clear();
+            // m_is.addText(cv::format("newYaw %3.3f", newYaw* M_PI / (180.0)));
+            // m_is.addText(cv::format("delta yaw %3.3f", (newYaw - rYaw)* M_PI / (180.0)));
+            // newYaw = cv::abs(newYaw) < 0.3 ? rYaw : newYaw;
+            // newYaw=newYaw* M_PI / (180.0);
             rPitch=rPitch* M_PI / (180.0);
+            rYaw=rYaw* M_PI / (180.0);
+            gYaw=gYaw* M_PI / (180.0);
+            float send_Yaw =gYaw+rYaw;
             sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
             resultPub.publish(*msg);
-            gimbal_excute(gimbalPub,rPitch,newYaw);
+            // if(cv::abs(newYaw - gYaw)>0.1)
+
+            gimbal_excute(gimbalPub,rPitch,send_Yaw);
+            
             /* 9.发给电控 */
             // m_communicator.send(newYaw, rPitch, statusA, SEND_STATUS_WM_PLACEHOLDER);
             //  PRINT_INFO("[attack] send = %ld", timeStamp);

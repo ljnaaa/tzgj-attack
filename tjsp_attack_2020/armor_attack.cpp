@@ -55,6 +55,7 @@ class rosDetect
             isClientPtr->update(Image->image, int(timestamp / 1000));
             double pitch,yaw;
             get_gimbal(pitch,yaw);
+
             attackPtr->run(Image->image,timestamp,yaw,pitch,resultPub,gimbalPub);
         }
 
@@ -66,9 +67,12 @@ class rosDetect
             listener->lookupTransform("/base_link", "/gimbal",
                                     ros::Time(0), transform);
             double roll;
-        
+
             tf::Matrix3x3(transform.getRotation()).getRPY(roll,pitch,yaw);
+            yaw = yaw/3.14159265*180.0;
+            pitch = pitch/3.14159265*180.0;
             }
+
             catch (tf::TransformException &ex) {
             ROS_ERROR("%s",ex.what());
             return ;
