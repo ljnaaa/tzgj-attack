@@ -9,6 +9,9 @@
 
 4.重新整理了代码格式
 
+5.从C++的tensorflow修改到了python的tensorflow
+
+6.支持仅用opencv检测装甲版
 
 ### `base.hpp`
 1.补充完全注释
@@ -19,3 +22,8 @@
 
 4.整理了代码格式
 
+### `tips`
+系统中应安装python2.7对应tensorflow库，请依次执行以下命令
+> sudo apt-get install python-pip python-dev
+> 
+> sudo pip install --upgrade https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-1.12.0-cp27-none-linux_x86_64.whl
