@@ -56,7 +56,7 @@ class rosDetect
             double pitch,yaw;
             get_gimbal(pitch,yaw);
 
-            attackPtr->run(Image->image,timestamp,yaw,pitch,resultPub,gimbalPub);
+            attackPtr->run(Image->image,timestamp,yaw,pitch,resultPub,gimbalPub,1);
         }
 
         void get_gimbal(double& pitch,double& yaw)

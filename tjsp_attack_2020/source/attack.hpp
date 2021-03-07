@@ -10,30 +10,16 @@
 #include "layers.hpp"
 #include <utility>
 #include "dirent.h"
-#include "tensorflow/core/framework/graph.pb.h"
-#include "tensorflow/core/public/session.h"
-#include "tensorflow/core/framework/tensor.h"
 #include "google/protobuf/wrappers.pb.h"
-#include "tensorflow/core/util/command_line_flags.h"
 #include <ros/ros.h>
 #include <roborts_msgs/GimbalAngle.h>
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
 #include <tf/transform_listener.h>
+//传递图片信息的srv文件
+#include "tjsp_attack_2020/img.h" 
 
 // 2021.3.5
-using tensorflow::string;
-using tensorflow::Tensor;
-
-using namespace tensorflow;
-
-/*模型路径*/
-const string model_path = "/home/icra01/icra/src/tzgj-attack/tjsp_attack_2020/Model/happyModel.pb";
-/*输入输出节点详见ipynb的summary*/
-const string input_name = "input_1:0";
-const string output_name = "y/Sigmoid:0";
-
-
 
 namespace armor
 {
@@ -100,7 +86,7 @@ namespace armor
      * @name m_preDetect
      * @func 通过hsv筛选和进行预处理获得装甲板
      */
-        void m_preDetect()
+        void m_preDetect(int pmode)
         {
             DEBUG("m_preDetect")
             /* 使用inRange对颜色进行筛选 */
@@ -199,37 +185,33 @@ namespace armor
                     if ((deltaAngle > 23.0 && minLength < 20) || (deltaAngle > 11.0 && minLength >= 20) ||
                         cv::abs(lights[i].length - lights[j].length) / minLength > 0.5 ||
                         cv::fastAtan2(cv::abs(AC2BC.y), cv::abs(AC2BC.x)) > 25.0 ||
-                        AC2BC.x / minLength > 7.1)
+                        AC2BC.x / minLength > 7.1 || cv::norm(AC2BC) / minLength > 2.5)
                         continue;
                     Target target;
                     /* 计算像素坐标 */
                     target.setPixelPts(lights[i].topPt, lights[i].bottomPt, lights[j].bottomPt, lights[j].topPt,
                                        m_startPt);
-                    if (cv::norm(AC2BC) / minLength > 4.9)
-                        target.type = TARGET_LARGE; // 大装甲
+                    /*  我们不用大装甲
+                        if (cv::norm(AC2BC) / minLength > 4.9)
+                            target.type = TARGET_LARGE; // 大装甲
+                    */
                     /* 获得扩展区域像素坐标, 若无法扩展则放弃该目标 */
                     if (!target.convert2ExternalPts2f())
                         continue;
-                    m_preTargets.emplace_back(target);
+                    if(pmode == 0)
+                        m_targets.emplace_back(target);
+                    else if(pmode == 1)
+                        m_preTargets.emplace_back(target);
                 }
             }
-            m_is.addEvent("preTargets", m_preTargets);
+            if(pmode == 0)
+                m_is.addClassifiedTargets("After Classify", m_targets);
+            else if(pmode == 1)
+                m_is.addEvent("preTargets", m_preTargets);
             DEBUG("preTargets end")
         }
         int m_cropNameCounter = 0;
 
-        /**
-         * @name mat2Tensor
-         * @param image 图片
-         * @param t tensor
-         * @func 将图片从mat转化为tensor
-         */ 
-        void mat2Tensor(cv::Mat &image, Tensor &t)
-        {
-            float *tensor_data_ptr = t.flat<float>().data();
-            cv::Mat fake_mat(image.rows, image.cols, CV_32FC(image.channels()), tensor_data_ptr);
-            image.convertTo(fake_mat, CV_32FC(image.channels()));
-        }
         /**
          * @name getThreshold
          * @param mat 图片
@@ -301,84 +283,56 @@ namespace armor
             }
             return true;
         }
-        /**
-         * @name init_my_tf
-         * @param session 交互接口
-         * @func 读取模型并设置到session中
-         * @return input
-         */ 
-        inline Tensor init_my_tf(Session *session)
-        {
-            /* 从pb文件中读取模型 */
-            GraphDef graph_def;
-            Status status = ReadBinaryProto(Env::Default(), model_path, &graph_def);  //读取Graph, 如果是文本形式的pb,使用ReadTextProto
-            if (!status.ok())
-                std::cout << status.ToString() << std::endl;
 
-            /* 将模型设置到创建的Session里 */
-            status = session->Create(graph_def);
-            if (!status.ok())
-                std::cout << status.ToString() << std::endl;
-
-            Tensor input(DT_FLOAT, TensorShape({1, fixedSize, fixedSize, 1}));
-            return input;
-        }
         /**
          * @name m_classify_single_tensor
          * @param isSave 是否保存样本图片
-         * @func 基于tensorflow的分类器
+         * @func 魔改后的分类器节点
          */ 
         void m_classify_single_tensor(bool isSave = false)
         {
             if (m_preTargets.empty())
                 return;
-            Session *session;
-            /* 创建session */
-            Status status = NewSession(SessionOptions(), &session);
-            if (!status.ok())
-                std::cout << status.ToString() << std::endl;
-            /* 初始化session */
-            Tensor input = init_my_tf(session);
-
             for (auto &_tar : m_preTargets)
             {
                 cv::Rect tmp = cv::boundingRect(_tar.pixelPts2f_Ex);
-                cv::Mat tmp2 = m_bgr_raw(tmp).clone();
-                /* 将图片变成目标大小 */
-                cv::Mat transMat = cv::getPerspectiveTransform(_tar.pixelPts2f_Ex,
-                                                               _tar.pixelPts2f_Ex);
-                cv::Mat _crop;
-                /* 投影变换 */
-                cv::warpPerspective(tmp2, _crop, transMat, cv::Size(tmp2.size())); 
-                /* 转灰度图 */
-                cv::cvtColor(_crop, _crop, cv::COLOR_BGR2GRAY);
-                /* 储存图 */
-                if (isSave)
-                {
-                    cv::imwrite(cv::format("../data/raw/%d.png", m_cropNameCounter++), _crop);
-                }
-                cv::Mat image;
+                cv::Mat image = m_bgr_raw(tmp).clone();
 
-                if (loadAndPre(_crop, image))
+                // 创建节点句柄
+                ros::NodeHandle n;
+
+                // 发现/classify服务后，创建一个服务客户端，连接名为/classify的service
+                ros::service::waitForService("/classify");
+                ros::ServiceClient img_client = n.serviceClient<tjsp_attack_2020::img>("/classify");
+                
+                std::vector<uchar> img;
+                uchar* pxvec=image.ptr<uchar>(0);
+                //遍历访问Mat中各个像素值
+                for (int i = 0; i < image.rows; i++)
                 {
-                    /* mat转换为tensor */
-                    mat2Tensor(image, input);
-                    /* 保留最终输出 */
-                    std::vector<tensorflow::Tensor> outputs;
-                    /* 计算最后结果 */
-                    TF_CHECK_OK(session->Run({std::pair<string, Tensor>(input_name, input)}, {output_name}, {}, &outputs));
-                    /* 获取输出 */
-                    auto output_c = outputs[0].scalar<float>();
-                    float result = output_c();
-                    /* 判断正负样本 */
-                    if (0.5 < result)
-                        m_targets.emplace_back(_tar);
+                    pxvec = image.ptr<uchar>(i);
+                    //三通道数据都在第一行依次排列，按照BGR顺序
+                    for (int j = 0; j < image.cols*image.channels(); j++)
+                    {
+                        img.emplace_back(uint(pxvec[j]));
+                    }
                 }
-                else
-                    continue;
+
+                // 初始化test::img的请求数据
+                tjsp_attack_2020::img srv;
+                srv.request.height = image.rows;
+                srv.request.width = image.cols;
+                srv.request.channels = image.channels();
+                srv.request.img = img;
+
+                img_client.call(srv);
+
+                // 显示服务调用结果
+                ROS_INFO("Result : %d", srv.response.result);
+
+                if (0.6 < srv.response.result)
+                    m_targets.emplace_back(_tar);
             }
-            session->Close();
-            delete session;
             m_is.addClassifiedTargets("After Classify", m_targets);
             DEBUG("m_classify end")
         }
@@ -562,10 +516,11 @@ namespace armor
          * @param timeStamp 时间戳
          * @param gYaw 从电控获得yaw
          * @param gPitch 从电控获得pitch
+         * @param pmode 处理模式，0为只使用opencv，1为使用卷积神经网络
          * @func 主运行函数
          * @return true
          */
-        bool run(cv::Mat &src, int64_t timeStamp, double gYaw, double gPitch,ros::Publisher& resultPub,ros::Publisher& gimbalPub)
+        bool run(cv::Mat &src, int64_t timeStamp, double gYaw, double gPitch,ros::Publisher& resultPub,ros::Publisher& gimbalPub, int pmode)
         {
             /* 1.初始化参数，判断是否启用ROI */
             m_bgr_raw = src;
@@ -582,13 +537,24 @@ namespace armor
                 m_bgr = m_bgr(latestShootRect);
                 m_startPt = latestShootRect.tl();
             }
-            /* 2.预检测 */
-            m_preDetect();
 
-            /* 3.通过分类器 */
-            m_is.clock("m_classify");
-            m_classify_single_tensor(1); 
-            m_is.clock("m_classify");
+            /* 2.检测+分类 */
+            /* 若为模式0，则只使用opencv进行处理 */
+
+            if(pmode == 0)
+            {
+                m_is.clock("m_classify");
+                m_preDetect(pmode);
+                m_is.clock("m_classify");
+            }
+            else if(pmode == 1)
+            {
+                m_preDetect(pmode);
+                m_is.clock("m_classify");
+                m_classify_single_tensor(1); 
+                m_is.clock("m_classify");
+            }
+
 
 
             s_latestTimeStamp.exchange(timeStamp);
@@ -603,14 +569,14 @@ namespace armor
                 tar.convert2WorldPts(-gYaw, gPitch);
             }
 
-            /* 4.目标匹配 */
+            /* 3.目标匹配 */
             emSendStatusA statusA = m_match();
             DEBUG("m_match end")
             if (!s_historyTargets.empty())
             {
                 m_is.addFinalTargets("selected", s_historyTargets[0]);
 
-                /* 5.预测部分 */
+                /* 4.预测部分 */
                 if (m_isEnablePredict)
                 {
                     cout << "m_isEnablePredict start !" << endl;
@@ -665,14 +631,14 @@ namespace armor
                     // m_is.addText(cv::format("inWorld.x %.0f", s_historyTargets[0].ptsInWorld.x));
                     // m_is.addText(cv::format("inWorld.y %.0f", s_historyTargets[0].ptsInWorld.y));
                     // m_is.addText(cv::format("inWorld.z %.0f", s_historyTargets[0].ptsInWorld.z));
-                /* 6.修正弹道并计算欧拉角 */
+                /* 5.修正弹道并计算欧拉角 */
                 DEBUG("correctTrajectory_and_calcEuler start")
                 s_historyTargets[0].correctTrajectory_and_calcEuler();
                 DEBUG("correctTrajectory_and_calcEuler end")
                 rYaw = s_historyTargets[0].rYaw;
                 rYaw=-rYaw;
                 rPitch = s_historyTargets[0].rPitch;
-                /* 7.射击策略 */
+                /* 6.射击策略 */
                 if (s_historyTargets.size() >= 3 &&
                     cv::abs(s_historyTargets[0].ptsInShoot.x) < 70.0 &&
                     cv::abs(s_historyTargets[0].ptsInShoot.y) < 60.0 &&
@@ -687,7 +653,7 @@ namespace armor
                 m_is.addText(cv::format("gYaw   %.3f", gYaw* M_PI / (180.0)));
                 m_is.addText(cv::format("rYaw + gYaw   %.3f", (rYaw + gYaw)* M_PI / (180.0)));
             }
-            /* 8.通过PID对yaw进行修正（参数未修改） */
+            /* 7.通过PID对yaw进行修正（参数未修改） */
             
             // float newYaw = rYaw;
             // if (cv::abs(rYaw) < 5)
@@ -708,7 +674,7 @@ namespace armor
 
             gimbal_excute(gimbalPub,rPitch,send_Yaw);
             
-            /* 9.发给电控 */
+            /* 8.发给电控 */
             // m_communicator.send(newYaw, rPitch, statusA, SEND_STATUS_WM_PLACEHOLDER);
             //  PRINT_INFO("[attack] send = %ld", timeStamp);
             return true;

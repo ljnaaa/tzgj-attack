@@ -258,8 +258,7 @@ namespace armor
                 newPts.z = pts.z;
             }
         }
-    } stCamera("/home/icra01/icra/src/tjsp_attack_2020/data/camera6mm.xml");
-
+    } stCamera("/home/dj/catkin_ws/src/tzgj-attack/tjsp_attack_2020/data/camera6mm.xml");
     // TODO: 测量, 实际检测灯长度不是55mm
     /**
      * 装甲板物理参数

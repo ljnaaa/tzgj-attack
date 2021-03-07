@@ -1,0 +1,8 @@
+uint16 height
+uint16 width
+uint8 channels
+uint8[] img
+
+---
+
+bool result
