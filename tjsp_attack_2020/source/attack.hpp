@@ -20,7 +20,7 @@
 #include <sensor_msgs/Image.h>
 #include <cv_bridge/cv_bridge.h>
 #include <tf/transform_listener.h>
-
+#include <roborts_msgs/ShootCmd.h>
 // 2021.3.5
 using tensorflow::string;
 using tensorflow::Tensor;
@@ -355,7 +355,7 @@ namespace armor
                 /* 储存图 */
                 if (isSave)
                 {
-                    cv::imwrite(cv::format("../data/raw/%d.png", m_cropNameCounter++), _crop);
+                    cv::imwrite(cv::format("/home/icra01/images/%d.png", m_cropNameCounter++), _crop);
                 }
                 cv::Mat image;
 
@@ -587,7 +587,7 @@ namespace armor
 
             /* 3.通过分类器 */
             m_is.clock("m_classify");
-            m_classify_single_tensor(1); 
+            m_classify_single_tensor(0); 
             m_is.clock("m_classify");
 
 
@@ -616,6 +616,8 @@ namespace armor
                     cout << "m_isEnablePredict start !" << endl;
                     if (statusA == SEND_STATUS_AUTO_AIM)
                     {   /* 获取世界坐标点 */
+                        /* 转换为云台坐标点 */
+                        
                         get_gimbal(gPitch,gYaw);
                         // m_communicator.getGlobalAngle(&gYaw, &gPitch);
                         s_historyTargets[0].convert2WorldPts(-gYaw, gPitch);
@@ -698,16 +700,25 @@ namespace armor
             // m_is.addText(cv::format("delta yaw %3.3f", (newYaw - rYaw)* M_PI / (180.0)));
             // newYaw = cv::abs(newYaw) < 0.3 ? rYaw : newYaw;
             // newYaw=newYaw* M_PI / (180.0);
-            rPitch=rPitch* M_PI / (180.0);
+            rPitch=-rPitch* M_PI / (180.0);
             rYaw=rYaw* M_PI / (180.0);
             gYaw=gYaw* M_PI / (180.0);
             float send_Yaw =gYaw+rYaw;
             sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
             resultPub.publish(*msg);
             // if(cv::abs(newYaw - gYaw)>0.1)
-
-            gimbal_excute(gimbalPub,rPitch,send_Yaw);
             
+            gimbal_excute(gimbalPub,rPitch,send_Yaw);
+            if(statusA == SEND_STATUS_AUTO_SHOOT){
+               ros::NodeHandle ros_nh;
+               ros::ServiceClient attack_client = ros_nh.serviceClient<roborts_msgs::ShootCmd>("cmd_shoot");
+               roborts_msgs::ShootCmd srv;
+               srv.request.mode=1;
+               srv.request.number=1;
+               attack_client.call(srv);
+               
+
+            }
             /* 9.发给电控 */
             // m_communicator.send(newYaw, rPitch, statusA, SEND_STATUS_WM_PLACEHOLDER);
             //  PRINT_INFO("[attack] send = %ld", timeStamp);

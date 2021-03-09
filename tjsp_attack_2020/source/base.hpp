@@ -227,7 +227,7 @@ namespace armor
          */
         static void convertPts2Euler(cv::Point3d &pts, float *pYaw, float *pPitch)
         {
-            float _pitch = cv::fastAtan2(pts.y, cv::sqrt(pts.x * pts.x + pts.z * pts.z));
+            float _pitch = cv::fastAtan2(pts.y+0.1, cv::sqrt(pts.x * pts.x + pts.z * pts.z));
             float _yaw = cv::fastAtan2(pts.x, cv::sqrt(pts.y * pts.y + pts.z * pts.z));
             _pitch = _pitch > 180 ? _pitch - 360 : _pitch;
             *pPitch = -_pitch;
@@ -487,7 +487,7 @@ namespace armor
         void correctTrajectory_and_calcEuler()
         {
             /* 弹道修正, TODO */
-            // stCamera.correctTrajectory(ptsInGimbal, ptsInShoot); //重力补偿修正
+            stCamera.correctTrajectory(ptsInGimbal, ptsInShoot); //重力补偿修正
             DEBUG("stCamera.correctTrajectory")
             /* 计算欧拉角 */
             Camera::convertPts2Euler(ptsInGimbal, &rYaw, &rPitch); //计算Pitch,Yaw传递给电控
