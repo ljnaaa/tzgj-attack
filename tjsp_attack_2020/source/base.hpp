@@ -218,21 +218,7 @@ namespace armor
             cv::solve(Left, Right, ABC, cv::DECOMP_SVD);
         }
 
-        /**
-         * @name convertPts2Euler
-         * @param pts 三维坐标
-         * @param pYaw
-         * @param pPitch
-         * @func 三维坐标转欧拉角工具函数
-         */
-        static void convertPts2Euler(cv::Point3d &pts, float *pYaw, float *pPitch)
-        {
-            float _pitch = cv::fastAtan2(pts.y+0.1, cv::sqrt(pts.x * pts.x + pts.z * pts.z));
-            float _yaw = cv::fastAtan2(pts.x, cv::sqrt(pts.y * pts.y + pts.z * pts.z));
-            _pitch = _pitch > 180 ? _pitch - 360 : _pitch;
-            *pPitch = -_pitch;
-            *pYaw = _yaw > 180 ? _yaw - 360 : _yaw;
-        }
+
 
         /**
          * @name correctTrajectory 弹道修正函数
@@ -240,24 +226,7 @@ namespace armor
          * @param newPts 修正后坐标值
          * @func 考虑到重力对子弹的影响，对云台所需仰角进行补偿
          */
-        void correctTrajectory(cv::Point3d &pts, cv::Point3d &newPts)
-        {
-            if (isTest)
-            {
-                newPts.x = pts.x + armor::stConfig.get<int>("curve.test-dx");
-                newPts.y = pts.y + armor::stConfig.get<int>("curve.test-dy");
-                newPts.z = pts.z;
-            }
-            else
-            {
-                /* 使用二次形拟合 */
-                newPts.x = pts.x + m_ABC_x.at<float>(0, 0) * pts.z * pts.z +
-                           m_ABC_x.at<float>(1, 0) * pts.z + m_ABC_x.at<float>(2, 0);
-                newPts.y = pts.y + m_ABC_y.at<float>(0, 0) * pts.z * pts.z +
-                           m_ABC_y.at<float>(1, 0) * pts.z + m_ABC_y.at<float>(2, 0);
-                newPts.z = pts.z;
-            }
-        }
+
     } stCamera("/home/icra01/icra/src/tjsp_attack_2020/data/camera6mm.xml");
 
     // TODO: 测量, 实际检测灯长度不是55mm
@@ -480,17 +449,58 @@ namespace armor
             ptsInGimbal_Predict.y = ptsInGimbal_PredictMat.at<double>(1);
             ptsInGimbal_Predict.z = ptsInGimbal_PredictMat.at<double>(2);
         }
+        #define GRAVITY 9.81
+        float BulletModel(float x, float v, float angle) { //x:m,v:m/s,angle:rad
+            float t, y;
+            t = (float)((exp(0.1 * x) - 1) / (0.1 * v * cos(angle)));
+            y = (float)(v * sin(angle) * t - GRAVITY * t * t / 2);
+            return y;
+        }
+
+        //x:distance , y: height
+        float pitch_feedback(float x, float y, float v) {
+            float y_temp, y_actual, dy;
+            float a;
+            y_temp = y;
+            // by iteration
+            for (int i = 0; i < 20; i++) {
+                a = (float) atan2(-y_temp, x);
+                y_actual = BulletModel(x, v, -a);
+                dy = y - y_actual;
+                y_temp = y_temp + dy;
+                if (fabsf(dy) < 0.01) {
+                break;
+                }
+                //printf("iteration num %d: angle %f,temp target y:%f,err of y:%f\n",i+1,a*180/3.1415926535,yTemp,dy);
+            }
+            return a;
+        }
+
+        /**
+         * @name convertPts2Euler
+         * @param pts 三维坐标
+         * @param pYaw
+         * @param pPitch
+         * @func 三维坐标转欧拉角工具函数
+         */
+        void convertPts2Euler(cv::Point3d &pts, float *pYaw, float *pPitch)
+        {
+            // float _pitch = cv::fastAtan2(pts.y+0.1, cv::sqrt(pts.x * pts.x + pts.z * pts.z));
+            float _pitch = pitch_feedback(cv::sqrt(pts.x * pts.x + pts.z * pts.z),pts.y+0.1,20.0);
+            float _yaw = cv::fastAtan2(pts.x, cv::sqrt(pts.y * pts.y + pts.z * pts.z));
+            _pitch = _pitch > 180 ? _pitch - 360 : _pitch;
+            *pPitch = -_pitch;
+            *pYaw = _yaw > 180 ? _yaw - 360 : _yaw;
+        }
 
         /**
          * @name 修正弹道 + 计算欧拉角
          */
         void correctTrajectory_and_calcEuler()
         {
-            /* 弹道修正, TODO */
-            stCamera.correctTrajectory(ptsInGimbal, ptsInShoot); //重力补偿修正
             DEBUG("stCamera.correctTrajectory")
             /* 计算欧拉角 */
-            Camera::convertPts2Euler(ptsInGimbal, &rYaw, &rPitch); //计算Pitch,Yaw传递给电控
+            convertPts2Euler(ptsInGimbal, &rYaw, &rPitch); //计算Pitch,Yaw传递给电控
             DEBUG("Camera::convertPts2Euler")
         }
     }; // end struct Target

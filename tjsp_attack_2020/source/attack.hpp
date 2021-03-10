@@ -556,6 +556,8 @@ namespace armor
             }
         }
 
+
+
         /**
          * @name run
          * @param src 彩图
