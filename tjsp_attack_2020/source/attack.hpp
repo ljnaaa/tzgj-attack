@@ -129,7 +129,7 @@ namespace armor
             /* 寻找边缘，并圈出countours */
             std::vector<std::vector<cv::Point2i>> contours;
             cv::findContours(bgrChecked, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
-            m_is.addEvent("contours", contours);
+            // m_is.addEvent("contours", contours);
             DEBUG("findContours end")
             /* 对灯条进行筛选 */
             std::vector<Light> lights;
@@ -182,7 +182,7 @@ namespace armor
                 lights.emplace_back(_light);
             }
             DEBUG("lights end")
-            m_is.addEvent("lights", lights);
+            // m_is.addEvent("lights", lights);
             /* 对筛选出的灯条按x大小进行排序 */
             std::sort(lights.begin(), lights.end(), [](Light &a_, Light &b_) -> bool {
                 return a_.centerPt.x < b_.centerPt.x;
