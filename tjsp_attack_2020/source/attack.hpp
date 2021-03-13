@@ -95,7 +95,7 @@ namespace armor
             mycnn::loadWeights("../info/dumpe2.nnet");
             m_isUseDialte = stConfig.get<bool>("auto.is-dilate");
             listener = new tf::TransformListener;
-            outFile.open("data.csv",ios::out);
+            outFile.open("data.csv",std::ios::out);
         }
         ~Attack()
         {
@@ -568,11 +568,11 @@ namespace armor
         {
             for(auto point:s_historyTargets[0].pixelPts2f)
             {
-                std::cout<<point[x]<<","<<point[y]<<",";
+                outFile<<point.x<<","<<point.y<<",";
             }
             double yaw,pitch;
             get_gimbal(pitch,yaw);
-            std::cout<<yaw<<std::endl;
+            outFile<<yaw<<std::endl;
         }
 
 
@@ -696,6 +696,7 @@ namespace armor
                 rYaw = s_historyTargets[0].rYaw;
                 rYaw=-rYaw;
                 rPitch = s_historyTargets[0].rPitch;
+                record();
                 /* 7.射击策略 */
                 if (s_historyTargets.size() >= 3 &&
                     cv::abs(s_historyTargets[0].ptsInShoot.x) < 70.0 &&
@@ -730,7 +731,7 @@ namespace armor
             resultPub.publish(*msg);
             // if(cv::abs(newYaw - gYaw)>0.1)
             
-            gimbal_excute(gimbalPub,rPitch,send_Yaw);
+            // gimbal_excute(gimbalPub,rPitch,send_Yaw);
             if(statusA == SEND_STATUS_AUTO_SHOOT){
                ros::NodeHandle ros_nh;
                ros::ServiceClient attack_client = ros_nh.serviceClient<roborts_msgs::ShootCmd>("cmd_shoot");
