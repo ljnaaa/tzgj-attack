@@ -664,6 +664,7 @@ namespace armor
                     resultPub.publish(*msg);
                     return false;
                 }
+                
                         // m_communicator.getGlobalAngle(&gYaw, &gPitch);
                 s_historyTargets[0].convert2WorldPts(-gYaw, gPitch);
                     // m_is.addText(cv::format("inWorld.x %.0f", s_historyTargets[0].ptsInWorld.x));
@@ -686,7 +687,7 @@ namespace armor
                                         s_historyTargets[0].ptsInGimbal.x / 1000.0,
                                         s_historyTargets[0].ptsInGimbal.y / 1000.0,
                                         s_historyTargets[0].ptsInGimbal.z / 1000.0));
-                m_is.addText(cv::format("rPitch %.3f", rPitch* M_PI / (180.0)));
+                m_is.addText(cv::format("rPitch %.3f", rPitch));
                 m_is.addText(cv::format("rYaw   %.3f", rYaw* M_PI / (180.0)));
                 m_is.addText(cv::format("gYaw   %.3f", gYaw* M_PI / (180.0)));
                 m_is.addText(cv::format("rYaw + gYaw   %.3f", (rYaw + gYaw)* M_PI / (180.0)));
@@ -702,7 +703,7 @@ namespace armor
             // m_is.addText(cv::format("delta yaw %3.3f", (newYaw - rYaw)* M_PI / (180.0)));
             // newYaw = cv::abs(newYaw) < 0.3 ? rYaw : newYaw;
             // newYaw=newYaw* M_PI / (180.0);
-            rPitch=-rPitch* M_PI / (180.0);
+            // rPitch=rPitch;
             rYaw=rYaw* M_PI / (180.0);
             gYaw=gYaw* M_PI / (180.0);
             float send_Yaw =gYaw+rYaw;

@@ -55,7 +55,9 @@ class rosDetect
             isClientPtr->update(Image->image, int(timestamp / 1000));
             double pitch,yaw;
             get_gimbal(pitch,yaw);
-
+            if(!armor::stCamera.cameraInfo_set){
+                return;
+            }
             attackPtr->run(Image->image,timestamp,yaw,pitch,resultPub,gimbalPub);
         }
 
@@ -69,7 +71,7 @@ class rosDetect
             double roll;
 
             tf::Matrix3x3(transform.getRotation()).getRPY(roll,pitch,yaw);
-            yaw = yaw/3.14159265*180.0;
+            yaw = yaw/3.14159265*180.0;//弧度转角度
             pitch = pitch/3.14159265*180.0;
             }
 

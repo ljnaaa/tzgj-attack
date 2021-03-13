@@ -15,7 +15,7 @@ namespace wm {
 
 /*计算旋转平移矩阵*/
     void calRvTv(const float yaw, const double pitch, cv::Mat &Rv, ROTATION_ORDER order) {
-        float tYaw = yaw * M_PI / (180.0);
+        float tYaw = yaw * M_PI / (180.0);//角度转弧度
         float tPitch = pitch * M_PI / (180.0);
 
         cv::Mat Rx = (cv::Mat_<double>(3, 3) << 1, 0, 0,
@@ -113,7 +113,7 @@ namespace wm {
 
         yaw = (float) acos(sqrt(pow(inputPt.z, 2) + pow(inputPt.y, 2)) / cv::norm(inputPt));  // yaw
         yaw = inputPt.x > 0 ? yaw : -yaw;
-        yaw *= (float) 57.295779513082;    // yaw
+        yaw *= (float) 57.295779513082;    // yaw弧度转角度
         pitch *= (float) 57.295779513082;  // pitch
 
     }
