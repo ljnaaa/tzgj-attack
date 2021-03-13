@@ -10,6 +10,8 @@
 #include "layers.hpp"
 #include <utility>
 #include "dirent.h"
+#include <iostream>
+#include <fstream>
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/public/session.h"
 #include "tensorflow/core/framework/tensor.h"
@@ -83,6 +85,7 @@ namespace armor
         bool m_isUseDialte;         // 是否膨胀
         bool mode;                  // 红蓝模式
         tf::TransformListener* listener;
+        std::ofstream outFile;
 
     public:
         explicit Attack(ImageShowClient &isClient, PID &pid) : m_pid(pid),
@@ -92,6 +95,11 @@ namespace armor
             mycnn::loadWeights("../info/dumpe2.nnet");
             m_isUseDialte = stConfig.get<bool>("auto.is-dilate");
             listener = new tf::TransformListener;
+            outFile.open("data.csv",ios::out);
+        }
+        ~Attack()
+        {
+            outFile.close();
         }
         void setMode(bool colorMode) { mode = colorMode; }
 
@@ -554,6 +562,17 @@ namespace armor
             ROS_ERROR("%s",ex.what());
             return ;
             }
+        }
+
+        void record()
+        {
+            for(auto point:s_historyTargets[0].pixelPts2f)
+            {
+                std::cout<<point[x]<<","<<point[y]<<",";
+            }
+            double yaw,pitch;
+            get_gimbal(pitch,yaw);
+            std::cout<<yaw<<std::endl;
         }
 
 
