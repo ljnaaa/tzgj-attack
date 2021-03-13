@@ -31,8 +31,8 @@ using namespace tensorflow;
 const string model_path = "/home/icra01/icra/src/tzgj-attack/tjsp_attack_2020/Model/happyModel.pb";
 /*输入输出节点详见ipynb的summary*/
 const string input_name = "input_1:0";
-const string output_name = "y/Sigmoid:0";
-
+const string output_name = "y/Sigmoid:0"; 
+#define debugit std::cout<<__LINE__<<std::endl;
 
 
 namespace armor
@@ -632,15 +632,18 @@ namespace armor
                             kalman.correct(s_historyTargets[0].ptsInWorld, timeStamp);
                         }
                     }
+                    
                     m_is.addText(cv::format("inWorld.x %.0f", s_historyTargets[0].ptsInWorld.x));
                     m_is.addText(cv::format("inWorld.y %.0f", s_historyTargets[0].ptsInWorld.y));
                     m_is.addText(cv::format("inWorld.z %.0f", s_historyTargets[0].ptsInWorld.z));
                     /* 进行预测和坐标修正 */
                     if (s_historyTargets.size() > 1)
                     {
+                        
                         kalman.predict(0.1, s_historyTargets[0].ptsInWorld_Predict);
                         /* 转换为云台坐标点 */
                         s_historyTargets[0].convert2GimbalPts(kalman.velocity);
+                        
                         m_is.addText(cv::format("vx %4.0f", s_historyTargets[0].vInGimbal3d.x));
                         m_is.addText(cv::format("vy %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.y)));
                         m_is.addText(cv::format("vz %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.z)));
@@ -648,9 +651,11 @@ namespace armor
                         {
                             double deltaX = cv::abs(13 * cv::abs(s_historyTargets[0].vInGimbal3d.x) *
                                                     s_historyTargets[0].ptsInGimbal.z / 3000);
+                            
                             deltaX = deltaX > 300 ? 300 : deltaX;
+                            std::cout<<deltaX<<std::endl;
                             s_historyTargets[0].ptsInGimbal.x +=
-                                deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
+                                1.5*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
                                 s_historyTargets[0].vInGimbal3d.x;
                         }
                     }
@@ -711,17 +716,17 @@ namespace armor
             resultPub.publish(*msg);
             // if(cv::abs(newYaw - gYaw)>0.1)
             
-            // gimbal_excute(gimbalPub,rPitch,send_Yaw);
-            // if(statusA == SEND_STATUS_AUTO_SHOOT){
-            //    ros::NodeHandle ros_nh;
-            //    ros::ServiceClient attack_client = ros_nh.serviceClient<roborts_msgs::ShootCmd>("cmd_shoot");
-            //    roborts_msgs::ShootCmd srv;
-            //    srv.request.mode=1;
-            //    srv.request.number=1;
-            //    attack_client.call(srv);
+            gimbal_excute(gimbalPub,rPitch,send_Yaw);
+            if(statusA == SEND_STATUS_AUTO_SHOOT){
+               ros::NodeHandle ros_nh;
+               ros::ServiceClient attack_client = ros_nh.serviceClient<roborts_msgs::ShootCmd>("cmd_shoot");
+               roborts_msgs::ShootCmd srv;
+               srv.request.mode=1;
+               srv.request.number=1;
+               attack_client.call(srv);
                
 
-            // }
+            }
             /* 9.发给电控 */
             // m_communicator.send(newYaw, rPitch, statusA, SEND_STATUS_WM_PLACEHOLDER);
             //  PRINT_INFO("[attack] send = %ld", timeStamp);

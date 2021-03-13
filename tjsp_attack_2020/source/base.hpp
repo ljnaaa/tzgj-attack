@@ -30,6 +30,7 @@
 #define ERROR "error"
 #define INFOO "infoo"
 #define WARN "warn"
+#define debugit std::cout<<__LINE__<<std::endl;
 
 /* 绿色 */
 #define PRINT_INFO(content, ...) printf("\033[32m" content "\033[0m", ##__VA_ARGS__)
@@ -408,11 +409,11 @@ namespace armor
                       -std::sin(gYaw_), 0, std::cos(gYaw_));
 
             /* pitch 为绕x轴旋转的 */
-            // m_rotX = (cv::Mat_<double>(3, 3)
-            //               << 1,
-            //           0, 0,
-            //           0, std::cos(gPitch_), -std::sin(gPitch_),
-            //           0, std::sin(gPitch_), std::cos(gPitch_));
+            m_rotX = (cv::Mat_<double>(3, 3)
+                          << 1,
+                      0, 0,
+                      0, 1,0,//std::cos(gPitch_), -std::sin(gPitch_),
+                      0, 0,1);//std::sin(gPitch_), std::cos(gPitch_));
 
             /* 先绕动系y轴旋转, 再绕动系x轴旋转 */
             cv::Mat _pts = (cv::Mat_<double>(3, 1) << ptsInGimbal.x, ptsInGimbal.y, ptsInGimbal.z);
@@ -437,6 +438,7 @@ namespace armor
             //convert2WorldPts获得的m_rotY,m_rotX取逆
             cv::Mat m_rotY_inv = m_rotY.inv(); 
             cv::Mat m_rotX_inv = m_rotX.inv();
+            // std::cout<<m_rotY.at<double>(0)<<" "<<m_rotY.at<double>(1)<<" "<<m_rotY.at<double>(2)<<std::endl;
             //创建一个3x1矩阵并将世界坐标点放入
             cv::Mat _v_Mat = (cv::Mat_<double>(3, 1) << v.x, v.y, v.z);
             //世界坐标->云台坐标转换
@@ -488,9 +490,8 @@ namespace armor
         void convertPts2Euler(cv::Point3d &pts, float *pYaw, float *pPitch)
         {
             // float _pitch = cv::fastAtan2(pts.y+0.1, cv::sqrt(pts.x * pts.x + pts.z * pts.z));
-            float _pitch = pitch_feedback(cv::sqrt(pts.x * pts.x + pts.z * pts.z),pts.y+0.05,20.0);
+            float _pitch = pitch_feedback(cv::sqrt(pts.x * pts.x + pts.z * pts.z),pts.y+0.05,15.0);
             float _yaw = cv::fastAtan2(pts.x, cv::sqrt(pts.y * pts.y + pts.z * pts.z));
-            std::cout<<pts.x<<" "<<pts.y<<" "<<pts.z<<std::endl;
             _pitch = _pitch >  M_PI ? _pitch - 2*M_PI : _pitch;
             *pPitch = -_pitch;
             *pYaw = _yaw > 180 ? _yaw - 360 : _yaw;
