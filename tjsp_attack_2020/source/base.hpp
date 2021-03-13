@@ -469,7 +469,6 @@ namespace armor
                 a = (float) atan2(-y_temp, x);
                 y_actual = BulletModel(x, v, -a);
                 dy = y - y_actual;
-                std::cout<<dy<<std::endl;
                 y_temp = y_temp + dy;
                 if (fabsf(dy) < 0.01) {
                 break;
@@ -489,8 +488,9 @@ namespace armor
         void convertPts2Euler(cv::Point3d &pts, float *pYaw, float *pPitch)
         {
             // float _pitch = cv::fastAtan2(pts.y+0.1, cv::sqrt(pts.x * pts.x + pts.z * pts.z));
-            float _pitch = pitch_feedback(cv::sqrt(pts.x * pts.x + pts.z * pts.z),pts.y+0.1,13.0);
+            float _pitch = pitch_feedback(cv::sqrt(pts.x * pts.x + pts.z * pts.z),pts.y+0.05,20.0);
             float _yaw = cv::fastAtan2(pts.x, cv::sqrt(pts.y * pts.y + pts.z * pts.z));
+            std::cout<<pts.x<<" "<<pts.y<<" "<<pts.z<<std::endl;
             _pitch = _pitch >  M_PI ? _pitch - 2*M_PI : _pitch;
             *pPitch = -_pitch;
             *pYaw = _yaw > 180 ? _yaw - 360 : _yaw;

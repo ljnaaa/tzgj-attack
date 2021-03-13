@@ -711,17 +711,17 @@ namespace armor
             resultPub.publish(*msg);
             // if(cv::abs(newYaw - gYaw)>0.1)
             
-            gimbal_excute(gimbalPub,rPitch,send_Yaw);
-            if(statusA == SEND_STATUS_AUTO_SHOOT){
-               ros::NodeHandle ros_nh;
-               ros::ServiceClient attack_client = ros_nh.serviceClient<roborts_msgs::ShootCmd>("cmd_shoot");
-               roborts_msgs::ShootCmd srv;
-               srv.request.mode=1;
-               srv.request.number=1;
-               attack_client.call(srv);
+            // gimbal_excute(gimbalPub,rPitch,send_Yaw);
+            // if(statusA == SEND_STATUS_AUTO_SHOOT){
+            //    ros::NodeHandle ros_nh;
+            //    ros::ServiceClient attack_client = ros_nh.serviceClient<roborts_msgs::ShootCmd>("cmd_shoot");
+            //    roborts_msgs::ShootCmd srv;
+            //    srv.request.mode=1;
+            //    srv.request.number=1;
+            //    attack_client.call(srv);
                
 
-            }
+            // }
             /* 9.发给电控 */
             // m_communicator.send(newYaw, rPitch, statusA, SEND_STATUS_WM_PLACEHOLDER);
             //  PRINT_INFO("[attack] send = %ld", timeStamp);
