@@ -33,7 +33,7 @@ class rosDetect
 
             armor::Attack attack(*isClientPtr,pid);
             attack.enablePredict(armor::stConfig.get<bool>("auto.enable-predict"));//是否进行预测
-            attack.setMode(armor::stConfig.get<std::string>("attack.attack-color") == "red");//击打颜色为红色，具体见配置文件
+            attack.setMode(armor::stConfig.get<std::string>("attack.attack-color") == "blue");//击打颜色为红色，具体见配置文件
             attackPtr = &attack;
             ros::NodeHandle n;
             startTime = ros::Time::now();

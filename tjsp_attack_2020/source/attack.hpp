@@ -108,12 +108,12 @@ namespace armor
             m_is.clock("inRange");
             if (mode)
             {
-                /* 红色 */
+                /* 蓝色 */
                 cv::inRange(m_bgr, cv::Scalar(0, 0, 140), cv::Scalar(180, 255, 255), bgrChecked);
             }
             else
             {
-                /* 蓝色 */
+                /* 红色 */
                 cv::inRange(m_bgr, cv::Scalar(150, 200, 150), cv::Scalar(255, 255, 255), bgrChecked);
             }
             m_is.clock("inRange");

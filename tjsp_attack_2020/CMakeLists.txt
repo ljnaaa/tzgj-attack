@@ -73,7 +73,7 @@ target_link_libraries(armorAttack ${OpenCV_LIBS})
 #file(GLOB HikVision "/opt/MVS/Samples_LinuxSDK/lib/64/*.so")
 #target_link_libraries(attack ${HikVision})
 target_link_libraries(armorAttack ${Boost_LIBRARIES} usb-1.0)
-target_link_libraries(armorAttack /home/icra01/icra/src/tzgj-attack/tjsp_attack_2020/tensorflow/libtensorflow_cc.so /home/icra01/icra/src/tzgj-attack/tjsp_attack_2020/tensorflow/libtensorflow_framework.so.2)
+target_link_libraries(armorAttack /home/ljn/AI2021/tzgj-attack/tjsp_attack_2020/tensorflow/libtensorflow_cc.so /home/ljn/AI2021/tzgj-attack/tjsp_attack_2020/tensorflow/libtensorflow_framework.so.2)
 
 # target_link_libraries(test libpthread)
 
