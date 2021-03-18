@@ -18,6 +18,7 @@
 #include <ros/ros.h>
 #include <roborts_msgs/GimbalAngle.h>
 #include <sensor_msgs/Image.h>
+#include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <tf/transform_listener.h>
 #include <roborts_msgs/ShootCmd.h>
@@ -393,7 +394,7 @@ namespace armor
             {
                 iter->rTick++;
                 /* 历史值数量大于30便删除末尾记录 */
-                if (iter->rTick > 30)
+                if (iter->rTick > 5)
                 {
                     s_historyTargets.erase(iter, s_historyTargets.end());
                     break;
@@ -567,7 +568,7 @@ namespace armor
          * @func 主运行函数
          * @return true
          */
-        bool run(cv::Mat &src, int64_t timeStamp, double gYaw, double gPitch,ros::Publisher& resultPub,ros::Publisher& gimbalPub)
+        bool run(cv::Mat &src, int64_t timeStamp, double gYaw, double gPitch,image_transport::Publisher& resultPub,ros::Publisher& gimbalPub)
         {
             /* 1.初始化参数，判断是否启用ROI */
             m_bgr_raw = src;

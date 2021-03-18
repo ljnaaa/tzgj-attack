@@ -2,6 +2,8 @@
 #include "imageshow.hpp"
 #include "base.hpp"
 #include "ros/ros.h"
+#include <image_transport/image_transport.h>
+
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
@@ -36,10 +38,11 @@ class rosDetect
             attack.setMode(armor::stConfig.get<std::string>("attack.attack-color") == "blue");//击打颜色为红色，具体见配置文件
             attackPtr = &attack;
             ros::NodeHandle n;
+            image_transport::ImageTransport it(n);
             startTime = ros::Time::now();
             ros::Subscriber image_sub = n.subscribe("/cam0/image_raw",1,&rosDetect::imageCB,this);
             ros::Subscriber cameraInfo_sub = n.subscribe("/cam0/camera_info",1,&rosDetect::cameraInfoCB,this);
-            resultPub = n.advertise<sensor_msgs::Image>("/cam0/result",1);
+            resultPub = it.advertise("detection",1);
             gimbalPub = n.advertise<roborts_msgs::GimbalAngle>("/cmd_gimbal_angle",1);
             listener = new tf::TransformListener;
             ros::spin();
@@ -105,7 +108,7 @@ class rosDetect
         armor::Attack* attackPtr;
         armor::PID* pidPtr;
         ros::Time startTime;
-        ros::Publisher resultPub;
+        image_transport::Publisher resultPub;
         ros::Publisher gimbalPub;
         tf::TransformListener* listener;
 
