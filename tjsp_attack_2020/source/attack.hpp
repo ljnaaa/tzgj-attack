@@ -16,12 +16,16 @@
 #include "google/protobuf/wrappers.pb.h"
 #include "tensorflow/core/util/command_line_flags.h"
 #include <ros/ros.h>
+#include <fstream>
 #include <roborts_msgs/GimbalAngle.h>
 #include <sensor_msgs/Image.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <tf/transform_listener.h>
 #include <roborts_msgs/ShootCmd.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <std_msgs/Bool.h>
+#include <roborts_msgs/GimbalAngle.h>
 // 2021.3.5
 using tensorflow::string;
 using tensorflow::Tensor;
@@ -34,6 +38,8 @@ const string model_path = "/home/icra01/icra/src/tzgj-attack/tjsp_attack_2020/Mo
 const string input_name = "input_1:0";
 const string output_name = "y/Sigmoid:0"; 
 #define debugit std::cout<<__LINE__<<std::endl;
+bool find_enemy=0;
+bool shootenemy=0;
 
 
 namespace armor
@@ -83,6 +89,7 @@ namespace armor
         PID &m_pid;                 // PID
         bool m_isUseDialte;         // 是否膨胀
         bool mode;                  // 红蓝模式
+        std::ofstream fs;
         tf::TransformListener* listener;
 
     public:
@@ -93,6 +100,11 @@ namespace armor
             mycnn::loadWeights("../info/dumpe2.nnet");
             m_isUseDialte = stConfig.get<bool>("auto.is-dilate");
             listener = new tf::TransformListener;
+            // fs.open("data.csv");
+        }
+        ~Attack()
+        {
+            // fs.close();
         }
         void setMode(bool colorMode) { mode = colorMode; }
 
@@ -413,6 +425,7 @@ namespace armor
                 {
                     s_historyTargets.emplace_front(*minTarElement);
                     PRINT_INFO("++++++++++++++++ 发现目标: 选择最近的 ++++++++++++++++++++\n");
+                    find_enemy=1;
                     return SEND_STATUS_AUTO_AIM;          //瞄准
                 }
                 else
@@ -472,6 +485,7 @@ namespace armor
                     /* 找到了 */
                     s_historyTargets.emplace_front(m_targets[closestElementIndex]);
                     PRINT_INFO("++++++++++++++++ 找到上一次目标 ++++++++++++++++++++\n");
+                    find_enemy=1;
                     return SEND_STATUS_AUTO_AIM;           //瞄准
                 }
                 else
@@ -637,6 +651,8 @@ namespace armor
                     m_is.addText(cv::format("inWorld.x %.0f", s_historyTargets[0].ptsInWorld.x));
                     m_is.addText(cv::format("inWorld.y %.0f", s_historyTargets[0].ptsInWorld.y));
                     m_is.addText(cv::format("inWorld.z %.0f", s_historyTargets[0].ptsInWorld.z));
+                    // fs<<ros::Time::now()<<","<<s_historyTargets[0].ptsInWorld.x<<","<<s_historyTargets[0].ptsInWorld.y
+                    // <<","<<s_historyTargets[0].ptsInWorld.z<<std::endl;
                     /* 进行预测和坐标修正 */
                     if (s_historyTargets.size() > 1)
                     {
@@ -668,6 +684,7 @@ namespace armor
                     sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
 
                     resultPub.publish(*msg);
+                    find_enemy=1;
                     return false;
                 }
                 
@@ -688,6 +705,7 @@ namespace armor
                     cv::abs(s_historyTargets[0].ptsInShoot.x) < 70.0 &&
                     cv::abs(s_historyTargets[0].ptsInShoot.y) < 60.0 &&
                     cv::abs(s_historyTargets[1].ptsInShoot.x) < 120.0 && cv::abs(s_historyTargets[1].ptsInShoot.y) < 90.0)
+                    shootenemy=1;
                     statusA = SEND_STATUS_AUTO_SHOOT;   //射击
                 m_is.addText(cv::format("ptsInGimbal: %2.3f %2.3f %2.3f",
                                         s_historyTargets[0].ptsInGimbal.x / 1000.0,
@@ -716,8 +734,51 @@ namespace armor
             sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
             resultPub.publish(*msg);
             // if(cv::abs(newYaw - gYaw)>0.1)
+            std_msgs::Bool finde;
+            finde.data=0;
+            geometry_msgs::PoseStamped goal;
+            std_msgs::Bool if_shoot;
+            if_shoot.data=0;
+            roborts_msgs:: GimbalAngle delta_angle;
+            delta_angle.yaw_angle=0;
+            delta_angle.pitch_angle=0;
+            goal.header.frame_id="enemypositon";
+            goal.pose.orientation.x=0;
+            goal.pose.orientation.y=0;
+            goal.pose.orientation.z=0;
+            goal.pose.orientation.w=1;
+            goal.pose.position.x=0;
+            goal.pose.position.y=0;
+            goal.pose.position.z=0;
+            ros::NodeHandle Find_Enemy;
+            ros::NodeHandle Shoot_Enemy;
+            ros::NodeHandle Position_Enemy;
+            ros::NodeHandle Angle_Enemy;
             
-            gimbal_excute(gimbalPub,rPitch,send_Yaw);
+            if(find_enemy){
+                finde.data=find_enemy;
+                goal.pose.position.x=s_historyTargets[0].ptsInWorld.x;
+                goal.pose.position.y=s_historyTargets[0].ptsInWorld.y;
+                goal.pose.position.z=s_historyTargets[0].ptsInWorld.z;
+                delta_angle.yaw_angle=send_Yaw;
+                delta_angle.pitch_angle=rPitch;
+            }
+            if(shootenemy){
+                if_shoot.data=shootenemy;
+            }
+            ros::Publisher enemy_angle_pub=Angle_Enemy.advertise<roborts_msgs::GimbalAngle>("G_angle",10);
+            ros::Publisher enemy_find_pub=Find_Enemy.advertise<std_msgs::Bool>("if_enemy",10);
+            ros::Publisher enemy_position_pub=Position_Enemy.advertise<geometry_msgs::PoseStamped>("goal",10);
+            ros::Publisher enemy_shoot_pub=Shoot_Enemy.advertise<std_msgs::Bool>("if_shoot",10);
+            enemy_find_pub.publish(finde);
+            enemy_position_pub.publish(goal);
+            enemy_shoot_pub.publish(if_shoot);
+            enemy_angle_pub.publish(delta_angle);
+            ros::Rate loop_rate(50);
+            
+
+
+            // gimbal_excute(gimbalPub,rPitch,send_Yaw);
             if(statusA == SEND_STATUS_AUTO_SHOOT){
                ros::NodeHandle ros_nh;
                ros::ServiceClient attack_client = ros_nh.serviceClient<roborts_msgs::ShootCmd>("cmd_shoot");
