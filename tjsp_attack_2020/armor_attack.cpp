@@ -61,7 +61,7 @@ class rosDetect
             if(!armor::stCamera.cameraInfo_set){
                 return;
             }
-            attackPtr->run(Image->image,timestamp,yaw,pitch,resultPub,gimbalPub);
+            attackPtr->run(Image->image,timestamp,yaw,pitch,resultPub,gimbalPub,1);
         }
 
         void get_gimbal(double& pitch,double& yaw)
@@ -126,11 +126,4 @@ int main(int argc,char **argv)
     std::cout << "Using OpenCV " << CV_VERSION << std::endl;
     rosDetect a = rosDetect();
     return 0;
-
-
-
-
-
-
-
 }

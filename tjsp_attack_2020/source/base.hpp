@@ -228,7 +228,7 @@ namespace armor
          * @func 考虑到重力对子弹的影响，对云台所需仰角进行补偿
          */
 
-    } stCamera("/home/icra01/icra/src/tjsp_attack_2020/data/camera6mm.xml");
+    } stCamera("/home/dj/catkin_ws/src/tzgj-attack/tjsp_attack_2020/data/camera6mm.xml");
 
     // TODO: 测量, 实际检测灯长度不是55mm
     /**
