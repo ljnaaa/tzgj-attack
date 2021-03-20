@@ -188,7 +188,7 @@ namespace armor
                     if ((deltaAngle > 23.0 && minLength < 20) || (deltaAngle > 11.0 && minLength >= 20) ||
                         cv::abs(lights[i].length - lights[j].length) / minLength > 0.5 ||
                         cv::fastAtan2(cv::abs(AC2BC.y), cv::abs(AC2BC.x)) > 25.0 ||
-                        AC2BC.x / minLength > 7.1 || cv::norm(AC2BC) / minLength > 2.5)
+                        AC2BC.x / minLength > 7.1 || cv::norm(AC2BC) / minLength > 4.0)
                         continue;
                     Target target;
                     /* 计算像素坐标 */
