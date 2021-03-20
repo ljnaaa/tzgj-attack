@@ -23,9 +23,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <tf/transform_listener.h>
 #include <roborts_msgs/ShootCmd.h>
-#include <geometry_msgs/PoseStamped.h>
-#include <std_msgs/Bool.h>
-#include <roborts_msgs/GimbalAngle.h>
+#include <roborts_msgs/Mess.h>
 // 2021.3.5
 using tensorflow::string;
 using tensorflow::Tensor;
@@ -40,7 +38,7 @@ const string output_name = "y/Sigmoid:0";
 #define debugit std::cout<<__LINE__<<std::endl;
 bool find_enemy=0;
 bool shootenemy=0;
-
+int b=0;
 
 namespace armor
 {
@@ -430,6 +428,7 @@ namespace armor
                 }
                 else
                 {
+                    shootenemy=0;
                     return SEND_STATUS_AUTO_NOT_FOUND;    //未找到
                 }
             } // end case A
@@ -582,7 +581,7 @@ namespace armor
          * @func 主运行函数
          * @return true
          */
-        bool run(cv::Mat &src, int64_t timeStamp, double gYaw, double gPitch,image_transport::Publisher& resultPub,ros::Publisher& gimbalPub)
+        bool run(cv::Mat &src, int64_t timeStamp, double gYaw, double gPitch,image_transport::Publisher& resultPub,ros::Publisher& gimbalPub,ros::Publisher& messpub)
         {
             /* 1.初始化参数，判断是否启用ROI */
             m_bgr_raw = src;
@@ -702,6 +701,8 @@ namespace armor
                 rPitch = s_historyTargets[0].rPitch;
                 /* 7.射击策略 */
                 if (s_historyTargets.size() >= 3 &&
+                    cv::abs(s_historyTargets[0].ptsInShoot.z) < 250.0 &&
+                    cv::abs(s_historyTargets[0].ptsInShoot.z) > 100.0 &&
                     cv::abs(s_historyTargets[0].ptsInShoot.x) < 70.0 &&
                     cv::abs(s_historyTargets[0].ptsInShoot.y) < 60.0 &&
                     cv::abs(s_historyTargets[1].ptsInShoot.x) < 120.0 && cv::abs(s_historyTargets[1].ptsInShoot.y) < 90.0)
@@ -734,49 +735,33 @@ namespace armor
             sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
             resultPub.publish(*msg);
             // if(cv::abs(newYaw - gYaw)>0.1)
-            std_msgs::Bool finde;
-            finde.data=0;
-            geometry_msgs::PoseStamped goal;
-            std_msgs::Bool if_shoot;
-            if_shoot.data=0;
-            roborts_msgs:: GimbalAngle delta_angle;
-            delta_angle.yaw_angle=0;
-            delta_angle.pitch_angle=0;
-            goal.header.frame_id="enemypositon";
-            goal.pose.orientation.x=0;
-            goal.pose.orientation.y=0;
-            goal.pose.orientation.z=0;
-            goal.pose.orientation.w=1;
-            goal.pose.position.x=0;
-            goal.pose.position.y=0;
-            goal.pose.position.z=0;
-            ros::NodeHandle Find_Enemy;
-            ros::NodeHandle Shoot_Enemy;
-            ros::NodeHandle Position_Enemy;
-            ros::NodeHandle Angle_Enemy;
+            roborts_msgs::Mess messdata;
+            messdata.G_angle.yaw_angle=0;
+            messdata.G_angle.pitch_angle=0;
+
+            messdata.goal.pose.orientation.x=0;
+            messdata.goal.pose.orientation.y=0;
+            messdata.goal.pose.orientation.z=0;
+            messdata.goal.pose.orientation.w=1;
+            messdata.goal.pose.position.x=0;
+            messdata.goal.pose.position.y=0;
+            messdata.goal.pose.position.z=0;
+            messdata.header.seq=b++;
+            messdata.header.stamp=ros::Time::now();
             
             if(find_enemy){
-                finde.data=find_enemy;
-                goal.pose.position.x=s_historyTargets[0].ptsInWorld.x;
-                goal.pose.position.y=s_historyTargets[0].ptsInWorld.y;
-                goal.pose.position.z=s_historyTargets[0].ptsInWorld.z;
-                delta_angle.yaw_angle=send_Yaw;
-                delta_angle.pitch_angle=rPitch;
+                messdata.if_enemy=find_enemy;
+                messdata.goal.pose.position.x=s_historyTargets[0].ptsInWorld.x;
+                messdata.goal.pose.position.y=s_historyTargets[0].ptsInWorld.y;
+                messdata.goal.pose.position.z=s_historyTargets[0].ptsInWorld.z;
+                messdata.G_angle.yaw_angle=send_Yaw;
+                messdata.G_angle.pitch_angle=rPitch;
             }
             if(shootenemy){
-                if_shoot.data=shootenemy;
+                messdata.if_shoot=shootenemy;
             }
-            ros::Publisher enemy_angle_pub=Angle_Enemy.advertise<roborts_msgs::GimbalAngle>("G_angle",10);
-            ros::Publisher enemy_find_pub=Find_Enemy.advertise<std_msgs::Bool>("if_enemy",10);
-            ros::Publisher enemy_position_pub=Position_Enemy.advertise<geometry_msgs::PoseStamped>("goal",10);
-            ros::Publisher enemy_shoot_pub=Shoot_Enemy.advertise<std_msgs::Bool>("if_shoot",10);
-            enemy_find_pub.publish(finde);
-            enemy_position_pub.publish(goal);
-            enemy_shoot_pub.publish(if_shoot);
-            enemy_angle_pub.publish(delta_angle);
-            ros::Rate loop_rate(50);
-            
 
+            messpub.publish(messdata);
 
             // gimbal_excute(gimbalPub,rPitch,send_Yaw);
             if(statusA == SEND_STATUS_AUTO_SHOOT){

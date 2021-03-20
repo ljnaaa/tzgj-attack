@@ -38,12 +38,14 @@ class rosDetect
             attack.setMode(armor::stConfig.get<std::string>("attack.attack-color") == "blue");//击打颜色为红色，具体见配置文件
             attackPtr = &attack;
             ros::NodeHandle n;
+            ros::NodeHandle messnode;
             image_transport::ImageTransport it(n);
             startTime = ros::Time::now();
             ros::Subscriber image_sub = n.subscribe("/cam0/image_raw",1,&rosDetect::imageCB,this);
             ros::Subscriber cameraInfo_sub = n.subscribe("/cam0/camera_info",1,&rosDetect::cameraInfoCB,this);
             resultPub = it.advertise("detection",1);
             gimbalPub = n.advertise<roborts_msgs::GimbalAngle>("/cmd_gimbal_angle",1);
+            messpub = messnode.advertise<roborts_msgs::Mess>("roborts_all",1);
             listener = new tf::TransformListener;
             ros::spin();
         }
@@ -61,7 +63,7 @@ class rosDetect
             if(!armor::stCamera.cameraInfo_set){
                 return;
             }
-            attackPtr->run(Image->image,timestamp,yaw,pitch,resultPub,gimbalPub);
+            attackPtr->run(Image->image,timestamp,yaw,pitch,resultPub,gimbalPub,messpub);
         }
 
         void get_gimbal(double& pitch,double& yaw)
@@ -110,6 +112,7 @@ class rosDetect
         ros::Time startTime;
         image_transport::Publisher resultPub;
         ros::Publisher gimbalPub;
+        ros::Publisher messpub;
         tf::TransformListener* listener;
 
 };
