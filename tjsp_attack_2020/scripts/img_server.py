@@ -30,7 +30,7 @@ def imgCallback(req):
     img = img.reshape((req.height, req.width, req.channels))
     img = Image.fromarray(img[:,:,::-1])
     # img.show()
-    img = img.resize((128, 128))
+    img = img.resize((32, 32))
     img = np.array(img) / 255.
     img = np.expand_dims(img, axis = 0)
 
@@ -41,7 +41,7 @@ def imgCallback(req):
     imag_num += 1
     #预测并反馈数据
     with graph.as_default():
-        return float(load_model.predict(img)) > 0.5
+        return np.argmax(load_model.predict(img), 1)[0]
     
 def img_server():
 	# ROS节点初始化

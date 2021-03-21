@@ -333,7 +333,7 @@ namespace armor
                 // 显示服务调用结果
                 ROS_INFO("Result : %d", srv.response.result);
 
-                if (0.6 < srv.response.result)
+                if (srv.response.result == 0 || srv.response.result == 1)
                     m_targets.emplace_back(_tar);
             }
             m_is.addClassifiedTargets("After Classify", m_targets);
