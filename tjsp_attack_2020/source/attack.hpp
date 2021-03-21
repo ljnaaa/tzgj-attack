@@ -36,6 +36,7 @@ const string model_path = "/home/icra01/icra/src/tzgj-attack/tjsp_attack_2020/Mo
 const string input_name = "input_1:0";
 const string output_name = "y/Sigmoid:0"; 
 #define debugit std::cout<<__LINE__<<std::endl;
+
 bool find_enemy=0;
 bool shootenemy=0;
 int b=0;
@@ -583,6 +584,8 @@ namespace armor
          */
         bool run(cv::Mat &src, int64_t timeStamp, double gYaw, double gPitch,image_transport::Publisher& resultPub,ros::Publisher& gimbalPub,ros::Publisher& messpub)
         {
+            find_enemy = false;
+            shootenemy = false;
             /* 1.初始化参数，判断是否启用ROI */
             m_bgr_raw = src;
             m_bgr = src;
@@ -748,9 +751,9 @@ namespace armor
             messdata.goal.pose.position.z=0;
             messdata.header.seq=b++;
             messdata.header.stamp=ros::Time::now();
-            
+            messdata.if_enemy=find_enemy;
             if(find_enemy){
-                messdata.if_enemy=find_enemy;
+
                 messdata.goal.pose.position.x=s_historyTargets[0].ptsInWorld.x;
                 messdata.goal.pose.position.y=s_historyTargets[0].ptsInWorld.y;
                 messdata.goal.pose.position.z=s_historyTargets[0].ptsInWorld.z;
