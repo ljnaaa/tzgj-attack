@@ -46,7 +46,7 @@ namespace armor
         SEND_STATUS_AUTO_AIM_FORMER = 0x30,  // 打上一帧
         SEND_STATUS_AUTO_AIM = 0x31,         // 去瞄准
         SEND_STATUS_AUTO_SHOOT = 0x32,       // 去打
-        SEND_STATUS_AUTO_NOT_FOUND = 0x33,   // 没找到
+        SEND_STATUS_AUTO_NOT_FOUND = 0x33,   // 没找
         SEND_STATUS_WM_AIM = 0x34            // 使用大风车
     } emSendStatusA;
 /*
@@ -632,7 +632,7 @@ namespace armor
                     if (statusA == SEND_STATUS_AUTO_AIM)
                     {   /* 获取世界坐标点 */
                         /* 转换为云台坐标点 */
-                        
+                        find_enemy = true;
                         get_gimbal(gPitch,gYaw);
                         // m_communicator.getGlobalAngle(&gYaw, &gPitch);
                         s_historyTargets[0].convert2WorldPts(-gYaw, gPitch);
@@ -745,7 +745,7 @@ namespace armor
                 enemy_data.goal.pose.position.x=s_historyTargets[0].ptsInWorld.x;
                 enemy_data.goal.pose.position.y=s_historyTargets[0].ptsInWorld.y;
                 enemy_data.goal.pose.position.z=s_historyTargets[0].ptsInWorld.z;
-                enemy_data.G_angle.yaw_angle=send_Yaw;
+                enemy_data.G_angle.yaw_angle=rYaw;
                 enemy_data.G_angle.pitch_angle=rPitch;
             }
 
