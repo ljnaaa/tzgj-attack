@@ -418,7 +418,7 @@ namespace armor {
                     cv::line(m_frame, _tar.pixelPts2f[i], _tar.pixelPts2f[(i + 1) % 4], currentColor, thickness);
                 }
             }
-            m_putMarginText(eventName + cv::format(": %d", int(targets.size())), currentColor, thickness);
+            m_putMarginText(eventName + cv::format(": 2333", int(targets.size())), currentColor, thickness);
         }
 
         /**
