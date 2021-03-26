@@ -670,7 +670,7 @@ namespace armor
                             deltaX = deltaX > 300 ? 300 : deltaX;
                             std::cout<<deltaX<<std::endl;
                             s_historyTargets[0].ptsInGimbal.x +=
-                                1.5*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
+                                1*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
                                 s_historyTargets[0].vInGimbal3d.x;
                         }
                     }
@@ -750,7 +750,7 @@ namespace armor
             }
 
 
-            // gimbal_excute(gimbalPub,rPitch,send_Yaw);
+            gimbal_excute(gimbalPub,rPitch,send_Yaw);
             if(statusA == SEND_STATUS_AUTO_SHOOT){
                ros::NodeHandle ros_nh;
                ros::ServiceClient attack_client = ros_nh.serviceClient<roborts_msgs::ShootCmd>("cmd_shoot");

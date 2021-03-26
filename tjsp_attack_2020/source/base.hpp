@@ -490,7 +490,7 @@ namespace armor
         void convertPts2Euler(cv::Point3d &pts, float *pYaw, float *pPitch)
         {
             // float _pitch = cv::fastAtan2(pts.y+0.1, cv::sqrt(pts.x * pts.x + pts.z * pts.z));
-            float _pitch = pitch_feedback(cv::sqrt(pts.x * pts.x + pts.z * pts.z),pts.y+0.05,17.3);
+            float _pitch = pitch_feedback(cv::sqrt(pts.x * pts.x + pts.z * pts.z),pts.y+50,17.3);
             float _yaw = cv::fastAtan2(pts.x, cv::sqrt(pts.y * pts.y + pts.z * pts.z));
             _pitch = _pitch >  M_PI ? _pitch - 2*M_PI : _pitch;
             *pPitch = -_pitch;
