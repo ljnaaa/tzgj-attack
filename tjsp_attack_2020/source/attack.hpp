@@ -12,6 +12,7 @@
 #include "dirent.h"
 #include "google/protobuf/wrappers.pb.h"
 #include <ros/ros.h>
+#include <fstream>
 #include <roborts_msgs/GimbalAngle.h>
 #include <sensor_msgs/Image.h>
 #include <image_transport/image_transport.h>
@@ -19,7 +20,7 @@
 #include <tf/transform_listener.h>
 #include <roborts_msgs/ShootCmd.h>
 #define debugit std::cout<<__LINE__<<std::endl;
-
+#include <roborts_msgs/Mess.h>
 //传递图片信息的srv文件
 #include "tjsp_attack_2020/img.h" 
 
@@ -33,7 +34,7 @@ namespace armor
         SEND_STATUS_AUTO_AIM_FORMER = 0x30,  // 打上一帧
         SEND_STATUS_AUTO_AIM = 0x31,         // 去瞄准
         SEND_STATUS_AUTO_SHOOT = 0x32,       // 去打
-        SEND_STATUS_AUTO_NOT_FOUND = 0x33,   // 没找到
+        SEND_STATUS_AUTO_NOT_FOUND = 0x33,   // 没找
         SEND_STATUS_WM_AIM = 0x34            // 使用大风车
     } emSendStatusA;
 /*
@@ -71,8 +72,11 @@ namespace armor
         PID &m_pid;                 // PID
         bool m_isUseDialte;         // 是否膨胀
         bool mode;                  // 红蓝模式
+        std::ofstream fs;
         tf::TransformListener* listener;
-
+        bool find_enemy;
+        bool shoot_enemy;
+        int cur_frame;
     public:
         explicit Attack(ImageShowClient &isClient, PID &pid) : m_pid(pid),
                                                                m_is(isClient),
@@ -81,6 +85,12 @@ namespace armor
             mycnn::loadWeights("../info/dumpe2.nnet");
             m_isUseDialte = stConfig.get<bool>("auto.is-dilate");
             listener = new tf::TransformListener;
+            cur_frame=0;
+            // fs.open("data.csv");
+        }
+        ~Attack()
+        {
+            // fs.close();
         }
         void setMode(bool colorMode) { mode = colorMode; }
 
@@ -525,8 +535,10 @@ namespace armor
          * @func 主运行函数
          * @return true
          */
-        bool run(cv::Mat &src, int64_t timeStamp, double gYaw, double gPitch,image_transport::Publisher& resultPub,ros::Publisher& gimbalPub, int pmode)
+        bool run(cv::Mat &src, int64_t timeStamp, double gYaw, double gPitch,image_transport::Publisher& resultPub,ros::Publisher& gimbalPub, ros::Publisher& messpub, int pmode)
         {
+            find_enemy = false;
+            shoot_enemy = false;
             /* 1.初始化参数，判断是否启用ROI */
             m_bgr_raw = src;
             m_bgr = src;
@@ -588,7 +600,7 @@ namespace armor
                     if (statusA == SEND_STATUS_AUTO_AIM)
                     {   /* 获取世界坐标点 */
                         /* 转换为云台坐标点 */
-                        
+                        find_enemy = true;
                         get_gimbal(gPitch,gYaw);
                         // m_communicator.getGlobalAngle(&gYaw, &gPitch);
                         s_historyTargets[0].convert2WorldPts(-gYaw, gPitch);
@@ -605,6 +617,8 @@ namespace armor
                     m_is.addText(cv::format("inWorld.x %.0f", s_historyTargets[0].ptsInWorld.x));
                     m_is.addText(cv::format("inWorld.y %.0f", s_historyTargets[0].ptsInWorld.y));
                     m_is.addText(cv::format("inWorld.z %.0f", s_historyTargets[0].ptsInWorld.z));
+                    // fs<<ros::Time::now()<<","<<s_historyTargets[0].ptsInWorld.x<<","<<s_historyTargets[0].ptsInWorld.y
+                    // <<","<<s_historyTargets[0].ptsInWorld.z<<std::endl;
                     /* 进行预测和坐标修正 */
                     if (s_historyTargets.size() > 1)
                     {
@@ -624,7 +638,7 @@ namespace armor
                             deltaX = deltaX > 300 ? 300 : deltaX;
                             std::cout<<deltaX<<std::endl;
                             s_historyTargets[0].ptsInGimbal.x +=
-                                1.5*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
+                                1*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
                                 s_historyTargets[0].vInGimbal3d.x;
                         }
                     }
@@ -634,8 +648,8 @@ namespace armor
                 if(statusA != SEND_STATUS_AUTO_AIM)
                 {
                     sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
-
                     resultPub.publish(*msg);
+                    find_enemy=false;
                     return false;
                 }
                 
@@ -653,9 +667,12 @@ namespace armor
                 rPitch = s_historyTargets[0].rPitch;
                 /* 6.射击策略 */
                 if (s_historyTargets.size() >= 3 &&
+                    cv::abs(s_historyTargets[0].ptsInShoot.z) < 250.0 &&
+                    cv::abs(s_historyTargets[0].ptsInShoot.z) > 100.0 &&
                     cv::abs(s_historyTargets[0].ptsInShoot.x) < 70.0 &&
                     cv::abs(s_historyTargets[0].ptsInShoot.y) < 60.0 &&
                     cv::abs(s_historyTargets[1].ptsInShoot.x) < 120.0 && cv::abs(s_historyTargets[1].ptsInShoot.y) < 90.0)
+                    shoot_enemy=true;
                     statusA = SEND_STATUS_AUTO_SHOOT;   //射击
                 m_is.addText(cv::format("ptsInGimbal: %2.3f %2.3f %2.3f",
                                         s_historyTargets[0].ptsInGimbal.x / 1000.0,
@@ -684,7 +701,23 @@ namespace armor
             sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
             resultPub.publish(*msg);
             // if(cv::abs(newYaw - gYaw)>0.1)
-            
+            roborts_msgs::Mess enemy_data;
+            enemy_data.goal.pose.orientation.x=0;
+            enemy_data.goal.pose.orientation.y=0;
+            enemy_data.goal.pose.orientation.z=0;
+            enemy_data.goal.pose.orientation.w=1;
+            enemy_data.header.seq=cur_frame++;
+            enemy_data.header.stamp=ros::Time::now();
+            enemy_data.if_enemy=find_enemy;
+            if(find_enemy){
+                enemy_data.goal.pose.position.x=s_historyTargets[0].ptsInWorld.x;
+                enemy_data.goal.pose.position.y=s_historyTargets[0].ptsInWorld.y;
+                enemy_data.goal.pose.position.z=s_historyTargets[0].ptsInWorld.z;
+                enemy_data.G_angle.yaw_angle=rYaw;
+                enemy_data.G_angle.pitch_angle=rPitch;
+            }
+
+
             gimbal_excute(gimbalPub,rPitch,send_Yaw);
             if(statusA == SEND_STATUS_AUTO_SHOOT){
                ros::NodeHandle ros_nh;
@@ -693,9 +726,11 @@ namespace armor
                srv.request.mode=1;
                srv.request.number=1;
                attack_client.call(srv);
-               
-
             }
+            if(shoot_enemy){
+                enemy_data.if_shoot=shoot_enemy;
+            }
+            messpub.publish(enemy_data);
             /* 9.发给电控 */
             // m_communicator.send(newYaw, rPitch, statusA, SEND_STATUS_WM_PLACEHOLDER);
             //  PRINT_INFO("[attack] send = %ld", timeStamp);
