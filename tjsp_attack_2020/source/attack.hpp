@@ -670,7 +670,7 @@ namespace armor
                             deltaX = deltaX > 300 ? 300 : deltaX;
                             std::cout<<deltaX<<std::endl;
                             s_historyTargets[0].ptsInGimbal.x +=
-                                1*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
+                                1.2*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
                                 s_historyTargets[0].vInGimbal3d.x;
                         }
                     }
@@ -749,7 +749,7 @@ namespace armor
                 enemy_data.G_angle.pitch_angle=rPitch;
             }
 
-
+        
             gimbal_excute(gimbalPub,rPitch,send_Yaw);
             if(statusA == SEND_STATUS_AUTO_SHOOT){
                ros::NodeHandle ros_nh;
