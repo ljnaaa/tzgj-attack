@@ -54,7 +54,7 @@ namespace armor
         {
             /* parse config.toml */
             std::cout<<getcwd(NULL,0)<<std::endl;
-            std::ifstream ifs("src/tzgj-attack/tjsp_attack_2020/config.toml");
+            std::ifstream ifs("/home/icra/icra01/src/tzgj-attack/tjsp_attack_2020/config.toml");
             toml::ParseResult pr = toml::parse(ifs);
             ifs.close();
             if (!pr.valid())
