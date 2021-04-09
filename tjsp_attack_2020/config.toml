@@ -1,7 +1,7 @@
 
 [attack]
-#    attack-color =  'red'
-    attack-color = 'red'
+    #attack-color =  'red'
+    attack-color = 'blue'
 
 # 弹道
 [curve]

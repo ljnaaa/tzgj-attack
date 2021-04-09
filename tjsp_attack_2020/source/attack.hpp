@@ -125,7 +125,7 @@ namespace armor
             else
             {
                 /* 红色 */
-                cv::inRange(m_bgr, cv::Scalar(150, 200, 150), cv::Scalar(255, 255, 255), bgrChecked);
+                cv::inRange(m_bgr, cv::Scalar(140, 0, 0), cv::Scalar(255, 255, 180), bgrChecked);
             }
             m_is.clock("inRange");
             DEBUG("inRange end")
@@ -699,14 +699,12 @@ namespace armor
                 rPitch = s_historyTargets[0].rPitch;
                 /* 7.射击策略 */
                 if (s_historyTargets.size() >= 3 &&
-                    cv::abs(s_historyTargets[0].ptsInShoot.z) < 250.0 &&
-                    cv::abs(s_historyTargets[0].ptsInShoot.z) > 100.0 &&
-                    cv::abs(s_historyTargets[0].ptsInShoot.x) < 70.0 &&
-                    cv::abs(s_historyTargets[0].ptsInShoot.y) < 60.0 &&
-                    cv::abs(s_historyTargets[1].ptsInShoot.x) < 120.0 && cv::abs(s_historyTargets[1].ptsInShoot.y) < 90.0)
-                    shoot_enemy=true;
+                    cv::abs(s_historyTargets[1].ptsInGimbal.x) < 100.0)
+		{
+		    shoot_enemy=true;
                     statusA = SEND_STATUS_AUTO_SHOOT;   //射击
-                m_is.addText(cv::format("ptsInGimbal: %2.3f %2.3f %2.3f",
+		}
+		m_is.addText(cv::format("ptsInGimbal: %2.3f %2.3f %2.3f",
                                         s_historyTargets[0].ptsInGimbal.x / 1000.0,
                                         s_historyTargets[0].ptsInGimbal.y / 1000.0,
                                         s_historyTargets[0].ptsInGimbal.z / 1000.0));
