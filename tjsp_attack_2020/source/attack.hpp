@@ -353,6 +353,7 @@ namespace armor
 
             for (auto &_tar : m_preTargets)
             {
+                // ros::Time pretime=ros::Time::now();
                 cv::Rect tmp = cv::boundingRect(_tar.pixelPts2f_Ex);
                 cv::Mat tmp2 = m_bgr_raw(tmp).clone();
                 /* 将图片变成目标大小 */
@@ -370,8 +371,12 @@ namespace armor
                 }
                 cv::Mat image;
 
+                    // ros::Time now=ros::Time::now();
+                    // std::cout<<"first"<<" "<<now-pretime<<"  ";
+                    // std::cout<<std::endl;
                 if (loadAndPre(_crop, image))
                 {
+                    // ros::Time pretime1=ros::Time::now();
                     /* mat转换为tensor */
                     mat2Tensor(image, input);
                     /* 保留最终输出 */
@@ -384,6 +389,9 @@ namespace armor
                     /* 判断正负样本 */
                     if (0.5 < result)
                         m_targets.emplace_back(_tar);
+                    // ros::Time now1=ros::Time::now();
+                    // std::cout<<"classify"<<" "<<now1-pretime1<<"  ";
+                    // std::cout<<std::endl;
                 }
                 else
                     continue;
@@ -532,9 +540,13 @@ namespace armor
 
                 rect.x = rect.x < 1 ? 1 : rect.x;
                 rect.y = rect.y < 1 ? 1 : rect.y;
-
+                int rect_yy=rect.y+rect.height;
                 rect.width = rect.x + rect.width >= size.width ? size.width - 1 - rect.x : rect.width;
-                rect.height = rect.y + rect.height >= size.height ? size.height - 1 - rect.y : rect.height;
+                // rect.height = rect.y + rect.height >= size.height ? size.height - 1 - rect.y : rect.height;
+
+                int temp=rect.y;
+                rect.y =rect.y>210?rect.y:210;
+                rect.height=rect_yy-rect.y;
             }
         }
 
@@ -593,9 +605,13 @@ namespace armor
             {
                 cv::Rect latestShootRect;
                 getBoundingRect(s_historyTargets[0], latestShootRect, stFrameInfo.size, true);
+                
                 m_is.addEvent("Bounding Rect", latestShootRect);
                 m_bgr = m_bgr(latestShootRect);
                 m_startPt = latestShootRect.tl();
+                cv::namedWindow("m_bgr");
+                cv::imshow("m_bgr",m_bgr);
+                cv::waitKey(5);
             }
             /* 2.预检测 */
             m_preDetect();
@@ -626,6 +642,7 @@ namespace armor
                 m_is.addFinalTargets("selected", s_historyTargets[0]);
 
                 /* 5.预测部分 */
+                // ros::Time pretime2=ros::Time::now();
                 if (m_isEnablePredict)
                 {
                     cout << "m_isEnablePredict start !" << endl;
@@ -675,6 +692,9 @@ namespace armor
                         }
                     }
                 }
+                // ros::Time now2=ros::Time::now();
+                // std::cout<<"yuce"<<" "<<now2-pretime2<<"  ";
+                // std::cout<<std::endl;
 
 
                 if(statusA != SEND_STATUS_AUTO_AIM)
@@ -748,7 +768,7 @@ namespace armor
             }
 
         
-            // gimbal_excute(gimbalPub,rPitch,send_Yaw);
+            gimbal_excute(gimbalPub,rPitch,send_Yaw);
             // if(statusA == SEND_STATUS_AUTO_SHOOT){
             //    ros::NodeHandle ros_nh;
             //    ros::ServiceClient attack_client = ros_nh.serviceClient<roborts_msgs::ShootCmd>("cmd_shoot");
