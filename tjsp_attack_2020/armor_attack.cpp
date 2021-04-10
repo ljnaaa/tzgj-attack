@@ -46,6 +46,8 @@ class rosDetect
             resultPub = it.advertise("detection",1);
             gimbalPub = n.advertise<roborts_msgs::GimbalAngle>("/cmd_gimbal_angle",1);
             messpub = messnode.advertise<roborts_msgs::Mess>("roborts_all",1);
+            ros::service::waitForService("/classify");
+            img_client = n.serviceClient<tjsp_attack_2020::img>("/classify");
             listener = new tf::TransformListener;
             ros::spin();
         }
@@ -63,7 +65,7 @@ class rosDetect
             if(!armor::stCamera.cameraInfo_set){
                 return;
             }
-            attackPtr->run(Image->image,timestamp,yaw,pitch,resultPub,gimbalPub,messpub,1);
+            attackPtr->run(Image->image,timestamp,yaw,pitch,resultPub,gimbalPub,messpub,img_client,1);
         }
 
         void get_gimbal(double& pitch,double& yaw)
@@ -114,7 +116,7 @@ class rosDetect
         ros::Publisher gimbalPub;
         ros::Publisher messpub;
         tf::TransformListener* listener;
-
+        ros::ServiceClient img_client;
 };
 
 

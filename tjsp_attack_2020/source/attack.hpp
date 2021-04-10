@@ -113,7 +113,7 @@ namespace armor
             else
             {
                 /* 红色 */
-                cv::inRange(m_bgr, cv::Scalar(150, 200, 150), cv::Scalar(255, 255, 255), bgrChecked);
+                cv::inRange(m_bgr, cv::Scalar(140, 0, 0), cv::Scalar(255, 255, 180), bgrChecked);
             }
             m_is.clock("inRange");
             DEBUG("inRange end")
@@ -302,12 +302,13 @@ namespace armor
          * @param isSave 是否保存样本图片
          * @func 魔改后的分类器节点
          */ 
-        void m_classify_single_tensor(bool isSave = false)
+        void m_classify_single_tensor(ros::ServiceClient& img_client,bool isSave = false)
         {
             if (m_preTargets.empty())
                 return;
             for (auto &_tar : m_preTargets)
             {
+                // ros::Time pretime=ros::Time::now();
                 cv::Rect tmp = cv::boundingRect(_tar.pixelPts2f_Ex);
                 cv::Mat image = m_bgr_raw(tmp).clone();
 
@@ -315,8 +316,7 @@ namespace armor
                 ros::NodeHandle n;
 
                 // 发现/classify服务后，创建一个服务客户端，连接名为/classify的service
-                ros::service::waitForService("/classify");
-                ros::ServiceClient img_client = n.serviceClient<tjsp_attack_2020::img>("/classify");
+
                 
                 std::vector<uchar> img;
                 uchar* pxvec=image.ptr<uchar>(0);
@@ -488,8 +488,13 @@ namespace armor
 
                 rect.x = rect.x < 1 ? 1 : rect.x;
                 rect.y = rect.y < 1 ? 1 : rect.y;
-
+                int rect_yy=rect.y+rect.height;
                 rect.width = rect.x + rect.width >= size.width ? size.width - 1 - rect.x : rect.width;
+                // rect.height = rect.y + rect.height >= size.height ? size.height - 1 - rect.y : rect.height;
+
+                int temp=rect.y;
+                rect.y =rect.y>210?rect.y:210;
+                rect.height=rect_yy-rect.y;
                 rect.height = rect.y + rect.height >= size.height ? size.height - 1 - rect.y : rect.height;
             }
         }
@@ -535,7 +540,7 @@ namespace armor
          * @func 主运行函数
          * @return true
          */
-        bool run(cv::Mat &src, int64_t timeStamp, double gYaw, double gPitch,image_transport::Publisher& resultPub,ros::Publisher& gimbalPub, ros::Publisher& messpub, int pmode)
+        bool run(cv::Mat &src, int64_t timeStamp, double gYaw, double gPitch,image_transport::Publisher& resultPub,ros::Publisher& gimbalPub, ros::Publisher& messpub,ros::ServiceClient& img_client, int pmode)
         {
             find_enemy = false;
             shoot_enemy = false;
@@ -553,11 +558,14 @@ namespace armor
                 m_is.addEvent("Bounding Rect", latestShootRect);
                 m_bgr = m_bgr(latestShootRect);
                 m_startPt = latestShootRect.tl();
+                // cv::namedWindow("m_bgr");
+                // cv::imshow("m_bgr",m_bgr);
+                // cv::waitKey(5);
             }
 
             /* 2.检测+分类 */
             /* 若为模式0，则只使用opencv进行处理 */
-
+            ros::Time pre = ros::Time::now();
             if(pmode == 0)
             {
                 m_is.clock("m_classify");
@@ -568,10 +576,10 @@ namespace armor
             {
                 m_preDetect(pmode);
                 m_is.clock("m_classify");
-                m_classify_single_tensor(1); 
+                m_classify_single_tensor(img_client,1); 
                 m_is.clock("m_classify");
             }
-
+            std::cout<<ros::Time::now()-pre<<std::endl;
 
 
             s_latestTimeStamp.exchange(timeStamp);
@@ -593,7 +601,8 @@ namespace armor
             {
                 m_is.addFinalTargets("selected", s_historyTargets[0]);
 
-                /* 4.预测部分 */
+                /* 5.预测部分 */
+                // ros::Time pretime2=ros::Time::now();
                 if (m_isEnablePredict)
                 {
                     cout << "m_isEnablePredict start !" << endl;
@@ -638,11 +647,14 @@ namespace armor
                             deltaX = deltaX > 300 ? 300 : deltaX;
                             std::cout<<deltaX<<std::endl;
                             s_historyTargets[0].ptsInGimbal.x +=
-                                1*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
+                                1.2*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
                                 s_historyTargets[0].vInGimbal3d.x;
                         }
                     }
                 }
+                // ros::Time now2=ros::Time::now();
+                // std::cout<<"yuce"<<" "<<now2-pretime2<<"  ";
+                // std::cout<<std::endl;
 
 
                 if(statusA != SEND_STATUS_AUTO_AIM)
@@ -667,14 +679,12 @@ namespace armor
                 rPitch = s_historyTargets[0].rPitch;
                 /* 6.射击策略 */
                 if (s_historyTargets.size() >= 3 &&
-                    cv::abs(s_historyTargets[0].ptsInShoot.z) < 250.0 &&
-                    cv::abs(s_historyTargets[0].ptsInShoot.z) > 100.0 &&
-                    cv::abs(s_historyTargets[0].ptsInShoot.x) < 70.0 &&
-                    cv::abs(s_historyTargets[0].ptsInShoot.y) < 60.0 &&
-                    cv::abs(s_historyTargets[1].ptsInShoot.x) < 120.0 && cv::abs(s_historyTargets[1].ptsInShoot.y) < 90.0)
-                    shoot_enemy=true;
+                    cv::abs(s_historyTargets[1].ptsInGimbal.x) < 100.0)
+		{
+		    shoot_enemy=true;
                     statusA = SEND_STATUS_AUTO_SHOOT;   //射击
-                m_is.addText(cv::format("ptsInGimbal: %2.3f %2.3f %2.3f",
+		}
+		m_is.addText(cv::format("ptsInGimbal: %2.3f %2.3f %2.3f",
                                         s_historyTargets[0].ptsInGimbal.x / 1000.0,
                                         s_historyTargets[0].ptsInGimbal.y / 1000.0,
                                         s_historyTargets[0].ptsInGimbal.z / 1000.0));
@@ -717,16 +727,16 @@ namespace armor
                 enemy_data.G_angle.pitch_angle=rPitch;
             }
 
-
+        
             gimbal_excute(gimbalPub,rPitch,send_Yaw);
-            if(statusA == SEND_STATUS_AUTO_SHOOT){
-               ros::NodeHandle ros_nh;
-               ros::ServiceClient attack_client = ros_nh.serviceClient<roborts_msgs::ShootCmd>("cmd_shoot");
-               roborts_msgs::ShootCmd srv;
-               srv.request.mode=1;
-               srv.request.number=1;
-               attack_client.call(srv);
-            }
+            // if(statusA == SEND_STATUS_AUTO_SHOOT){
+            //    ros::NodeHandle ros_nh;
+            //    ros::ServiceClient attack_client = ros_nh.serviceClient<roborts_msgs::ShootCmd>("cmd_shoot");
+            //    roborts_msgs::ShootCmd srv;
+            //    srv.request.mode=1;
+            //    srv.request.number=1;
+            //    attack_client.call(srv);
+            // }
             if(shoot_enemy){
                 enemy_data.if_shoot=shoot_enemy;
             }

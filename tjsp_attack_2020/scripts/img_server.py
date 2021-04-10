@@ -14,7 +14,7 @@ imag_num = 1
 
 
 # 默认情况下服务使用的是多线程模式，TensorFlow在不同线程中加载和使用模型会出错，使用全局默认graph方法解决
-global graph,model
+global graph,load_model
 graph = tf.get_default_graph()
 
 #加载模型
@@ -39,7 +39,7 @@ def imgCallback(req):
     print "处理图片数：%d，时间：%f" % (imag_num, time() - time_0)
     
     imag_num += 1
-    #预测并反馈数据
+    #预测并反馈数据'
     with graph.as_default():
         return np.argmax(load_model.predict(img), 1)[0]
     
