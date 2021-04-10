@@ -30,8 +30,10 @@ def imgCallback(req):
     img = img.reshape((req.height, req.width, req.channels))
     img = Image.fromarray(img[:,:,::-1])
     # img.show()
-    img = img.resize((32, 32))
+    img = img.convert('L')
+    img = img.resize((64, 64))
     img = np.array(img) / 255.
+    img = np.expand_dims(img, axis =2 )
     img = np.expand_dims(img, axis = 0)
 
     if imag_num == 1:
