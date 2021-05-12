@@ -20,7 +20,8 @@
 #include <tf/transform_listener.h>
 #include <roborts_msgs/ShootCmd.h>
 #define debugit std::cout<<__LINE__<<std::endl;
-#include <roborts_msgs/Mess.h>
+//#include <roborts_msgs/Mess.h>
+#include <roborts_msgs/test.h>
 //传递图片信息的srv文件
 #include "tjsp_attack_2020/img.h" 
 
@@ -343,8 +344,10 @@ namespace armor
                 // 显示服务调用结果
                 ROS_INFO("Result : %d", srv.response.result);
 
-                if (srv.response.result == 0 || srv.response.result == 1)
+                if (srv.response.result == 0 || srv.response.result == 1){
+                    _tar.id = srv.response.result + 1;
                     m_targets.emplace_back(_tar);
+                }
             }
             m_is.addClassifiedTargets("After Classify", m_targets);
             DEBUG("m_classify end")
@@ -579,7 +582,6 @@ namespace armor
                 m_classify_single_tensor(img_client,1); 
                 m_is.clock("m_classify");
             }
-            std::cout<<ros::Time::now()-pre<<std::endl;
 
 
             s_latestTimeStamp.exchange(timeStamp);
@@ -711,20 +713,24 @@ namespace armor
             sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
             resultPub.publish(*msg);
             // if(cv::abs(newYaw - gYaw)>0.1)
-            roborts_msgs::Mess enemy_data;
-            enemy_data.goal.pose.orientation.x=0;
-            enemy_data.goal.pose.orientation.y=0;
-            enemy_data.goal.pose.orientation.z=0;
-            enemy_data.goal.pose.orientation.w=1;
-            enemy_data.header.seq=cur_frame++;
-            enemy_data.header.stamp=ros::Time::now();
+            roborts_msgs::test enemy_data;
+            enemy_data.pose.pose.orientation.x=0;
+            enemy_data.pose.pose.orientation.y=0;
+            enemy_data.pose.pose.orientation.z=0;
+            enemy_data.pose.pose.orientation.w=1;
+            enemy_data.pose.header.seq=cur_frame++;
+            enemy_data.pose.header.stamp=ros::Time::now();
+	    enemy_data.pose.header.frame_id = "/base_link";
             enemy_data.if_enemy=find_enemy;
             if(find_enemy){
-                enemy_data.goal.pose.position.x=s_historyTargets[0].ptsInWorld.x;
-                enemy_data.goal.pose.position.y=s_historyTargets[0].ptsInWorld.y;
-                enemy_data.goal.pose.position.z=s_historyTargets[0].ptsInWorld.z;
+                enemy_data.pose.pose.position.x=s_historyTargets[0].ptsInWorld.x;
+                enemy_data.pose.pose.position.y=s_historyTargets[0].ptsInWorld.y;
+                enemy_data.pose.pose.position.z=s_historyTargets[0].ptsInWorld.z;
                 enemy_data.G_angle.yaw_angle=rYaw;
                 enemy_data.G_angle.pitch_angle=rPitch;
+                enemy_data.id = s_historyTargets[0].id;
+                enemy_data.pose.header.stamp.sec = timeStamp;
+                enemy_data.color = mode;    //红蓝模式,yaml文件中读出
             }
 
         

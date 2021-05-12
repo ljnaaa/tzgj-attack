@@ -31,14 +31,14 @@ def imgCallback(req):
     img = Image.fromarray(img[:,:,::-1])
     # img.show()
     img = img.convert('L')
-    img = img.resize((64, 64))
+    img = img.resize((128, 128))
     img = np.array(img) / 255.
     img = np.expand_dims(img, axis =2 )
     img = np.expand_dims(img, axis = 0)
 
     if imag_num == 1:
         time_0 = time()
-    print "处理图片数：%d，时间：%f" % (imag_num, time() - time_0)
+    #print "处理图片数：%d，时间：%f" % (imag_num, time() - time_0)
     
     imag_num += 1
     #预测并反馈数据'

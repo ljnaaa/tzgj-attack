@@ -45,7 +45,7 @@ class rosDetect
             ros::Subscriber cameraInfo_sub = n.subscribe("/cam0/camera_info",1,&rosDetect::cameraInfoCB,this);
             resultPub = it.advertise("detection",1);
             gimbalPub = n.advertise<roborts_msgs::GimbalAngle>("/cmd_gimbal_angle",1);
-            messpub = messnode.advertise<roborts_msgs::Mess>("roborts_all",1);
+            messpub = messnode.advertise<roborts_msgs::test>("roborts_all",1);
             ros::service::waitForService("/classify");
             img_client = n.serviceClient<tjsp_attack_2020::img>("/classify");
             listener = new tf::TransformListener;

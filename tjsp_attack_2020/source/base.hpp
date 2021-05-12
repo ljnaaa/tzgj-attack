@@ -284,6 +284,7 @@ namespace armor
         float rPitch;                    // 相对Pitch值, 发给电控
         float rYaw;                      // 相对Yaw值, 发给电控
         int rTick;                       // 相对帧编号
+        int id = 0;                      // id为0，则为非装甲板，1为1类，2为2类
         emTargetType type;               // TARGET_SMALL, TARGET_TARGET
 
         cv::Mat m_rotY, m_rotX; // 旋转到绝对坐标系
