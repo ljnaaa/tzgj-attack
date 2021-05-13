@@ -407,9 +407,9 @@ namespace armor
                     cv::Moments m_2 = cv::moments(s_historyTargets[0].pixelPts2f);   
                     PRINT_WARN("distanceA = %f\n", distanceA);
                     /* 进行matchShaoes的阈值限定，并保证归一化中心矩同号 */ 
-                    if (distanceA > 0.5 ||
-                        (m_1.nu11 + m_1.nu30 + m_1.nu12) * (m_2.nu11 + m_2.nu30 + m_2.nu12) < 0)
-                        continue;
+                    // if (distanceA > 0.5 ||
+                    //     (m_1.nu11 + m_1.nu30 + m_1.nu12) * (m_2.nu11 + m_2.nu30 + m_2.nu12) < 0)
+                    //     continue;
 
                     double distanceB;
                     if (m_isEnablePredict)
