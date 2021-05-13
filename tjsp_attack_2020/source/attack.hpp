@@ -316,8 +316,10 @@ namespace armor
                 // 创建节点句柄
                 ros::NodeHandle n;
 
-                // 发现/classify服务后，创建一个服务客户端，连接名为/classify的service
-
+                if (isSave)
+                {
+                    cv::imwrite(cv::format("/home/icra01/images/%d.png", m_cropNameCounter++), image);
+                }
                 
                 std::vector<uchar> img;
                 uchar* pxvec=image.ptr<uchar>(0);
@@ -579,7 +581,7 @@ namespace armor
             {
                 m_preDetect(pmode);
                 m_is.clock("m_classify");
-                m_classify_single_tensor(img_client,1); 
+                m_classify_single_tensor(img_client,0); 
                 m_is.clock("m_classify");
             }
 

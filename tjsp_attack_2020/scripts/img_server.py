@@ -18,7 +18,7 @@ global graph,load_model
 graph = tf.get_default_graph()
 
 #加载模型
-model_path = os.path.dirname(os.path.dirname(__file__)) + '/model/classify.h5'
+model_path = os.path.dirname(os.path.dirname(__file__)) + '/model/classify_temp.h5'
 load_model = load_model(model_path)
 
 def imgCallback(req):
