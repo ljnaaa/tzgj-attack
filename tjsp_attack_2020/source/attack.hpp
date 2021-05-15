@@ -14,7 +14,6 @@
 #include <ros/ros.h>
 #include <fstream>
 #include <roborts_msgs/GimbalAngle.h>
-#include <roborts_msgs/GimbalFb.h>
 #include <sensor_msgs/Image.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
@@ -22,7 +21,13 @@
 #include <roborts_msgs/ShootCmd.h>
 #define debugit std::cout<<__LINE__<<std::endl;
 //#include <roborts_msgs/Mess.h>
+
+// 单车版本
 #include <roborts_msgs/test.h>
+
+// 多车版本
+#include <roborts_msgs/single_car.h>
+#include <roborts_msgs/visual_detection.h>
 //传递图片信息的srv文件
 #include "tjsp_attack_2020/img.h" 
 
@@ -54,80 +59,6 @@ namespace armor
     std::atomic<int64_t> AttackBase::s_latestTimeStamp(0);
     std::deque<Target> AttackBase::s_historyTargets;
     Kalman AttackBase::kalman;
-
-    class IMUBuff
-    {
-        protected:
-            const int LEN = 5;
-            std::deque<roborts_msgs::GimbalFb> imu_history;
-            ros::NodeHandle imu_n_;
-            ros::Subscriber imu_sub;
-            IMUBuff
-            {
-                imu_sub = imu_n_.subscribe("gimbal_feedback", 1, storeIMUHistory);
-            }
-
-            void storeIMUHistory(const roborts_msgs::GimbalFb::ConstPtr &fb)
-            {
-                while(size(imu_history) >= LEN) imu_history.pop_back();
-                imu_history.push_front(*fb);
-            }
-
-            float getPredYaw(int64_t timeStamp)
-            {
-                int64_t post_time, pre_time;
-                float post_yaw, pre_yaw;
-                for(auto it=imu_history.begin(); it!=imu_history.end(); it++)
-                {
-                    if(it->stamp >= timeStamp)
-                    {
-                        post_yaw = (*it).imu.yaw_angle;
-                        post_time = (*it).stamp;
-                    }
-                    else
-                    {
-                        pre_yaw = (*it).imu.yaw_angle;
-                        pre_time = (*it).stamp;
-                        break;
-                    }
-                }
-                float k = (post_yaw-pre_yaw)/float(post_time-pre_time);
-                pred_yaw = pre_yaw + k*(timeStamp-pre_time);
-                
-                
-                std::cout<<"PRE YAW: "<<post_yaw<<" , TIME: "<<pre_time<<"\n";
-                std::cout<<"POST YAW: "<<pre_yaw<<" , TIME: "<<post_time<<"\n";
-                std::cout<<"PREDICT YAW: " << pred_yaw<<" , TIME: "<<timeStamp<<"\n";
-                
-                return pred_yaw;
-            }
-
-            float getPredPitch(int64_t timeStamp)
-            {
-                int64_t post_time, pre_time;
-                float post_pitch, pre_pitch;
-                for(auto it=imu_history.begin(); it!=imu_history.end(); it++)
-                {
-                    if(it->stamp >= timeStamp)
-                    {
-                        post_pitch = (*it).imu.pitch_angle;
-                        post_time = (*it).stamp;
-                    }
-                    else
-                    {
-                        pre_pitch = (*it).imu.pitch_angle;
-                        pre_time = (*it).stamp;
-                        break;
-                    }
-                }
-                
-                float k = (post_pitch-pre_pitch)/float(post_time-pre_time);
-                return pre_pitch + k*(timeStamp-pre_time);
-            }
-
-    }
-
-
 /*
   自瞄主类
  */
@@ -189,7 +120,7 @@ namespace armor
             else
             {
                 /* 红色 */
-                cv::inRange(m_bgr, cv::Scalar(140, 0, 0), cv::Scalar(255, 255, 180), bgrChecked);
+                cv::inRange(m_bgr, cv::Scalar(150, 200, 150), cv::Scalar(255, 255, 255), bgrChecked);
             }
             m_is.clock("inRange");
             DEBUG("inRange end")
@@ -439,7 +370,7 @@ namespace armor
             for (auto iter = s_historyTargets.begin(); iter != s_historyTargets.end(); iter++)
             {
                 iter->rTick++;
-                /* 历史值数量大于30便删除末尾记录 */
+                /* 历史值数量大于30便删除末尾记录 (似乎是大于5就删除？？？）*/
                 if (iter->rTick > 5)
                 {
                     s_historyTargets.erase(iter, s_historyTargets.end());
@@ -453,7 +384,7 @@ namespace armor
                 /* 选择数组中距离最近的目标作为击打目标 */
                 auto minTarElement = std::min_element(
                     m_targets.begin(), m_targets.end(), [](Target &a_, Target &b_) -> bool {
-                        return cv::norm(a_.ptsInGimbal) < cv::norm(b_.ptsInGimbal);
+                        return cv::norm(a_.ptsInGimbal) < cv::norm(b_.ptsInGimbal);     //找到离得最近的装甲板
                     });                                   //找到含最小元素的目标位置
                 if (minTarElement != m_targets.end())
                 {
@@ -628,7 +559,7 @@ namespace armor
             m_bgr_raw = src;
             m_bgr = src;
             m_currentTimeStamp = timeStamp;
-            m_targets.clear();
+            m_targets.clear();      //m_targets只储存本次监测到的对象，因为每调用一次，就会清零
             m_preTargets.clear();
             m_startPt = cv::Point(0, 0);
             if (s_historyTargets.size() >= 2 && s_historyTargets[0].rTick <= 10)
@@ -726,7 +657,7 @@ namespace armor
                             deltaX = deltaX > 300 ? 300 : deltaX;
                             std::cout<<deltaX<<std::endl;
                             s_historyTargets[0].ptsInGimbal.x +=
-                                1.2*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
+                                1*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
                                 s_historyTargets[0].vInGimbal3d.x;
                         }
                     }
@@ -758,12 +689,14 @@ namespace armor
                 rPitch = s_historyTargets[0].rPitch;
                 /* 6.射击策略 */
                 if (s_historyTargets.size() >= 3 &&
-                    cv::abs(s_historyTargets[1].ptsInGimbal.x) < 100.0)
-		{
-		    shoot_enemy=true;
+                    cv::abs(s_historyTargets[0].ptsInShoot.z) < 250.0 &&
+                    cv::abs(s_historyTargets[0].ptsInShoot.z) > 100.0 &&
+                    cv::abs(s_historyTargets[0].ptsInShoot.x) < 70.0 &&
+                    cv::abs(s_historyTargets[0].ptsInShoot.y) < 60.0 &&
+                    cv::abs(s_historyTargets[1].ptsInShoot.x) < 120.0 && cv::abs(s_historyTargets[1].ptsInShoot.y) < 90.0)
+                    shoot_enemy=true;
                     statusA = SEND_STATUS_AUTO_SHOOT;   //射击
-		}
-		m_is.addText(cv::format("ptsInGimbal: %2.3f %2.3f %2.3f",
+                m_is.addText(cv::format("ptsInGimbal: %2.3f %2.3f %2.3f",
                                         s_historyTargets[0].ptsInGimbal.x / 1000.0,
                                         s_historyTargets[0].ptsInGimbal.y / 1000.0,
                                         s_historyTargets[0].ptsInGimbal.z / 1000.0));
@@ -785,12 +718,68 @@ namespace armor
             // newYaw=newYaw* M_PI / (180.0);
             // rPitch=rPitch;
             rYaw=rYaw* M_PI / (180.0);
-            //gYaw=gYaw* M_PI / (180.0);
-            gYaw_pred = imu_buff.getPredYaw(timeStamp);
-            float send_Yaw =gYaw_pred+rYaw;
+            gYaw=gYaw* M_PI / (180.0);
+            float send_Yaw =gYaw+rYaw;
             sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
             resultPub.publish(*msg);
             // if(cv::abs(newYaw - gYaw)>0.1)
+
+            roborts_msgs::visual_detection vision_data;
+            vision_data.G_angle.yaw_angle=rYaw;
+            vision_data.G_angle.pitch_angle=rPitch;
+            vision_data.if_enemy=find_enemy;
+            if(shoot_enemy){
+                vision_data.if_shoot=shoot_enemy;
+            }
+            std::vector<roborts_msgs::single_car> temp;
+            vision_data.multicar = temp;
+            /*
+            single_car
+            int32 id     #0:unknown
+            int32 color  #0:unknown 1:red 2:blue
+            geometry_msgs/PoseStamped pose   #时间戳填传感器采集时间戳，坐标系选map(地图坐标)或base_link(底盘坐标系)
+            */
+            if(find_enemy){
+                roborts_msgs::single_car mycar;     //第一个，要射的
+                mycar.pose.pose.orientation.x=0;
+                mycar.pose.pose.orientation.y=0;
+                mycar.pose.pose.orientation.z=0;
+                mycar.pose.pose.orientation.w=1;
+                mycar.pose.header.seq=cur_frame++;
+                mycar.pose.header.stamp=ros::Time::now();
+	            mycar.pose.header.frame_id = "/base_link";
+                mycar.pose.pose.position.x=s_historyTargets[0].ptsInWorld.x;
+                mycar.pose.pose.position.y=s_historyTargets[0].ptsInWorld.y;
+                mycar.pose.pose.position.z=s_historyTargets[0].ptsInWorld.z;
+                mycar.pose.header.stamp.sec = timeStamp;
+                mycar.id = s_historyTargets[0].id;
+                mycar.color = mode;    //红蓝模式,yaml文件中读出
+                temp.emplace_back(mycar);
+                //先检查本次target中有无与已瞄id不同的id
+                Target* minother = nullptr;
+                for(auto& _tar : m_targets){
+                    if(_tar.id != mycar.id){
+                        if(minother == nullptr){
+                            minother = &_tar;
+                        }
+                        else{
+                            if(cv::norm(_tar.ptsInGimbal) < cv::norm(minother->ptsInGimbal))
+                                minother = &_tar;
+                        }
+                    }
+                }
+                if(minother != nullptr){
+                    //其他都不变，只需要改一下位姿和id即可
+                    mycar.pose.pose.position.x=minother->ptsInWorld.x;
+                    mycar.pose.pose.position.y=minother->ptsInWorld.y;
+                    mycar.pose.pose.position.z=minother->ptsInWorld.z;
+                    mycar.id = minother->id;
+                    temp.emplace_back(mycar);
+                }
+            }
+            
+
+            /*
             roborts_msgs::test enemy_data;
             enemy_data.pose.pose.orientation.x=0;
             enemy_data.pose.pose.orientation.y=0;
@@ -798,7 +787,7 @@ namespace armor
             enemy_data.pose.pose.orientation.w=1;
             enemy_data.pose.header.seq=cur_frame++;
             enemy_data.pose.header.stamp=ros::Time::now();
-	    enemy_data.pose.header.frame_id = "/base_link";
+	        enemy_data.pose.header.frame_id = "/base_link";
             enemy_data.if_enemy=find_enemy;
             if(find_enemy){
                 enemy_data.pose.pose.position.x=s_historyTargets[0].ptsInWorld.x;
@@ -810,7 +799,7 @@ namespace armor
                 enemy_data.pose.header.stamp.sec = timeStamp;
                 enemy_data.color = mode;    //红蓝模式,yaml文件中读出
             }
-
+            */
         
             gimbal_excute(gimbalPub,rPitch,send_Yaw);
             // if(statusA == SEND_STATUS_AUTO_SHOOT){
@@ -821,10 +810,7 @@ namespace armor
             //    srv.request.number=1;
             //    attack_client.call(srv);
             // }
-            if(shoot_enemy){
-                enemy_data.if_shoot=shoot_enemy;
-            }
-            messpub.publish(enemy_data);
+            messpub.publish(vision_data);
             /* 9.发给电控 */
             // m_communicator.send(newYaw, rPitch, statusA, SEND_STATUS_WM_PLACEHOLDER);
             //  PRINT_INFO("[attack] send = %ld", timeStamp);

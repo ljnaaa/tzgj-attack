@@ -41,11 +41,13 @@ class rosDetect
             ros::NodeHandle messnode;
             image_transport::ImageTransport it(n);
             startTime = ros::Time::now();
-            ros::Subscriber image_sub = n.subscribe("/cam0/image_raw",1,&rosDetect::imageCB,this);
+            ros::Subscriber image_sub = n.subscribe("/cam0/image_raw",1,&rosDetect::imageCB,this);  //收到摄像头的消息，就回调该函数
+                                                                                                    //感觉迷你PC算力真是强大
             ros::Subscriber cameraInfo_sub = n.subscribe("/cam0/camera_info",1,&rosDetect::cameraInfoCB,this);
             resultPub = it.advertise("detection",1);
             gimbalPub = n.advertise<roborts_msgs::GimbalAngle>("/cmd_gimbal_angle",1);
-            messpub = messnode.advertise<roborts_msgs::test>("roborts_all",1);
+            //messpub = messnode.advertise<roborts_msgs::test>("roborts_all",1);
+            messpub = messnode.advertise<roborts_msgs::visual_detection>("roborts_all",1);//定义
             ros::service::waitForService("/classify");
             img_client = n.serviceClient<tjsp_attack_2020::img>("/classify");
             listener = new tf::TransformListener;
@@ -65,7 +67,7 @@ class rosDetect
             if(!armor::stCamera.cameraInfo_set){
                 return;
             }
-            attackPtr->run(Image->image,timestamp,yaw,pitch,resultPub,gimbalPub,messpub,img_client,1);
+            attackPtr->run(Image->image,timestamp,yaw,pitch,resultPub,gimbalPub,messpub,img_client,1);//传输处理
         }
 
         void get_gimbal(double& pitch,double& yaw)
@@ -114,7 +116,7 @@ class rosDetect
         ros::Time startTime;
         image_transport::Publisher resultPub;
         ros::Publisher gimbalPub;
-        ros::Publisher messpub;
+        ros::Publisher messpub;//声明
         tf::TransformListener* listener;
         ros::ServiceClient img_client;
 };
