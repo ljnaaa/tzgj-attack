@@ -57,19 +57,20 @@ namespace armor
 
     class IMUBuff
     {
-        protected:
+        public:
             const int LEN = 5;
             std::deque<roborts_msgs::GimbalFb> imu_history;
             ros::NodeHandle imu_n_;
             ros::Subscriber imu_sub;
-            IMUBuff
+            
+            IMUBuff()
             {
-                imu_sub = imu_n_.subscribe("gimbal_feedback", 1, storeIMUHistory);
+                imu_sub = imu_n_.subscribe("gimbal_feedback", 1, &IMUBuff::storeIMUHistory, this);
             }
 
             void storeIMUHistory(const roborts_msgs::GimbalFb::ConstPtr &fb)
             {
-                while(size(imu_history) >= LEN) imu_history.pop_back();
+                while(imu_history.size() >= LEN) imu_history.pop_back();
                 imu_history.push_front(*fb);
             }
 
@@ -79,20 +80,20 @@ namespace armor
                 float post_yaw, pre_yaw;
                 for(auto it=imu_history.begin(); it!=imu_history.end(); it++)
                 {
-                    if(it->stamp >= timeStamp)
+                    if((it->stamp).toSec() >= timeStamp)
                     {
                         post_yaw = (*it).imu.yaw_angle;
-                        post_time = (*it).stamp;
+                        post_time = (*it).stamp.toSec();
                     }
                     else
                     {
                         pre_yaw = (*it).imu.yaw_angle;
-                        pre_time = (*it).stamp;
+                        pre_time = (*it).stamp.toSec();
                         break;
                     }
                 }
                 float k = (post_yaw-pre_yaw)/float(post_time-pre_time);
-                pred_yaw = pre_yaw + k*(timeStamp-pre_time);
+                float pred_yaw = pre_yaw + k*(timeStamp-pre_time);
                 
                 
                 std::cout<<"PRE YAW: "<<post_yaw<<" , TIME: "<<pre_time<<"\n";
@@ -108,15 +109,15 @@ namespace armor
                 float post_pitch, pre_pitch;
                 for(auto it=imu_history.begin(); it!=imu_history.end(); it++)
                 {
-                    if(it->stamp >= timeStamp)
+                    if((it->stamp).toSec() >= timeStamp)
                     {
                         post_pitch = (*it).imu.pitch_angle;
-                        post_time = (*it).stamp;
+                        post_time = (*it).stamp.toSec();
                     }
                     else
                     {
                         pre_pitch = (*it).imu.pitch_angle;
-                        pre_time = (*it).stamp;
+                        pre_time = (*it).stamp.toSec();
                         break;
                     }
                 }
@@ -125,7 +126,7 @@ namespace armor
                 return pre_pitch + k*(timeStamp-pre_time);
             }
 
-    }
+    };
 
 
 /*
@@ -622,6 +623,7 @@ namespace armor
          */
         bool run(cv::Mat &src, int64_t timeStamp, double gYaw, double gPitch,image_transport::Publisher& resultPub,ros::Publisher& gimbalPub, ros::Publisher& messpub,ros::ServiceClient& img_client, int pmode)
         {
+            IMUBuff imu_buff = IMUBuff();
             find_enemy = false;
             shoot_enemy = false;
             /* 1.初始化参数，判断是否启用ROI */
@@ -786,7 +788,7 @@ namespace armor
             // rPitch=rPitch;
             rYaw=rYaw* M_PI / (180.0);
             //gYaw=gYaw* M_PI / (180.0);
-            gYaw_pred = imu_buff.getPredYaw(timeStamp);
+            float gYaw_pred = imu_buff.getPredYaw(timeStamp);
             float send_Yaw =gYaw_pred+rYaw;
             sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
             resultPub.publish(*msg);
