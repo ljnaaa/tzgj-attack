@@ -14,6 +14,7 @@
 #include <ros/ros.h>
 #include <fstream>
 #include <roborts_msgs/GimbalAngle.h>
+#include <roborts_msgs/GimbalFb.h>
 #include <sensor_msgs/Image.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
@@ -53,6 +54,80 @@ namespace armor
     std::atomic<int64_t> AttackBase::s_latestTimeStamp(0);
     std::deque<Target> AttackBase::s_historyTargets;
     Kalman AttackBase::kalman;
+
+    class IMUBuff
+    {
+        protected:
+            const int LEN = 5;
+            std::deque<roborts_msgs::GimbalFb> imu_history;
+            ros::NodeHandle imu_n_;
+            ros::Subscriber imu_sub;
+            IMUBuff
+            {
+                imu_sub = imu_n_.subscribe("gimbal_feedback", 1, storeIMUHistory);
+            }
+
+            void storeIMUHistory(const roborts_msgs::GimbalFb::ConstPtr &fb)
+            {
+                while(size(imu_history) >= LEN) imu_history.pop_back();
+                imu_history.push_front(*fb);
+            }
+
+            float getPredYaw(int64_t timeStamp)
+            {
+                int64_t post_time, pre_time;
+                float post_yaw, pre_yaw;
+                for(auto it=imu_history.begin(); it!=imu_history.end(); it++)
+                {
+                    if(it->stamp >= timeStamp)
+                    {
+                        post_yaw = (*it).imu.yaw_angle;
+                        post_time = (*it).stamp;
+                    }
+                    else
+                    {
+                        pre_yaw = (*it).imu.yaw_angle;
+                        pre_time = (*it).stamp;
+                        break;
+                    }
+                }
+                float k = (post_yaw-pre_yaw)/float(post_time-pre_time);
+                pred_yaw = pre_yaw + k*(timeStamp-pre_time);
+                
+                
+                std::cout<<"PRE YAW: "<<post_yaw<<" , TIME: "<<pre_time<<"\n";
+                std::cout<<"POST YAW: "<<pre_yaw<<" , TIME: "<<post_time<<"\n";
+                std::cout<<"PREDICT YAW: " << pred_yaw<<" , TIME: "<<timeStamp<<"\n";
+                
+                return pred_yaw;
+            }
+
+            float getPredPitch(int64_t timeStamp)
+            {
+                int64_t post_time, pre_time;
+                float post_pitch, pre_pitch;
+                for(auto it=imu_history.begin(); it!=imu_history.end(); it++)
+                {
+                    if(it->stamp >= timeStamp)
+                    {
+                        post_pitch = (*it).imu.pitch_angle;
+                        post_time = (*it).stamp;
+                    }
+                    else
+                    {
+                        pre_pitch = (*it).imu.pitch_angle;
+                        pre_time = (*it).stamp;
+                        break;
+                    }
+                }
+                
+                float k = (post_pitch-pre_pitch)/float(post_time-pre_time);
+                return pre_pitch + k*(timeStamp-pre_time);
+            }
+
+    }
+
+
 /*
   自瞄主类
  */
@@ -710,8 +785,9 @@ namespace armor
             // newYaw=newYaw* M_PI / (180.0);
             // rPitch=rPitch;
             rYaw=rYaw* M_PI / (180.0);
-            gYaw=gYaw* M_PI / (180.0);
-            float send_Yaw =gYaw+rYaw;
+            //gYaw=gYaw* M_PI / (180.0);
+            gYaw_pred = imu_buff.getPredYaw(timeStamp);
+            float send_Yaw =gYaw_pred+rYaw;
             sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
             resultPub.publish(*msg);
             // if(cv::abs(newYaw - gYaw)>0.1)
