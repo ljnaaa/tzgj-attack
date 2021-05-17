@@ -60,68 +60,100 @@ namespace armor
         public:
             const int LEN = 5;
             std::deque<roborts_msgs::GimbalFb> imu_history;
-            ros::NodeHandle imu_n_;
             ros::Subscriber imu_sub;
             
             IMUBuff()
             {
+                ros::NodeHandle imu_n_;
                 imu_sub = imu_n_.subscribe("gimbal_feedback", 1, &IMUBuff::storeIMUHistory, this);
             }
 
             void storeIMUHistory(const roborts_msgs::GimbalFb::ConstPtr &fb)
             {
+                //std::cout<<"aaaaaaaaaaaaaaaaaa"<<std::endl;
                 while(imu_history.size() >= LEN) imu_history.pop_back();
                 imu_history.push_front(*fb);
             }
 
-            float getPredYaw(int64_t timeStamp)
+            double getPredYaw(int64_t timeStamp)
             {
                 int64_t post_time, pre_time;
-                float post_yaw, pre_yaw;
-                for(auto it=imu_history.begin(); it!=imu_history.end(); it++)
+                double post_yaw, pre_yaw;
+                if(imu_history.size()<2)
                 {
-                    if((it->stamp).toSec() >= timeStamp)
+                    return imu_history[0].imu.yaw_angle;
+                }
+                if((imu_history[0].stamp).toSec()*pow(10,6) <= timeStamp)
+                {
+                    post_yaw = imu_history[0].imu.yaw_angle;
+                    post_time = imu_history[0].stamp.toSec()*pow(10,6);
+                    pre_yaw = imu_history[1].imu.yaw_angle;
+                    pre_time = imu_history[1].stamp.toSec()*pow(10,6);
+                }
+                else
+                {
+                    for(auto it=imu_history.begin(); it!=imu_history.end(); it++)
                     {
-                        post_yaw = (*it).imu.yaw_angle;
-                        post_time = (*it).stamp.toSec();
-                    }
-                    else
-                    {
-                        pre_yaw = (*it).imu.yaw_angle;
-                        pre_time = (*it).stamp.toSec();
-                        break;
+                        if((it->stamp).toSec()*pow(10,6) >= timeStamp)
+                        {
+                            post_yaw = (*it).imu.yaw_angle;
+                            post_time = (*it).stamp.toSec()*pow(10,6);
+                        }
+                        else
+                        {
+                            pre_yaw = (*it).imu.yaw_angle;
+                            pre_time = (*it).stamp.toSec()*pow(10,6);
+                            break;
+                        }
                     }
                 }
-                float k = (post_yaw-pre_yaw)/float(post_time-pre_time);
-                float pred_yaw = pre_yaw + k*(timeStamp-pre_time);
-                
-                
-                std::cout<<"PRE YAW: "<<post_yaw<<" , TIME: "<<pre_time<<"\n";
-                std::cout<<"POST YAW: "<<pre_yaw<<" , TIME: "<<post_time<<"\n";
-                std::cout<<"PREDICT YAW: " << pred_yaw<<" , TIME: "<<timeStamp<<"\n";
-                
+                double k = (post_yaw-pre_yaw)/double(post_time-pre_time);
+                double pred_yaw = pre_yaw + k*(timeStamp-pre_time);
+                int64_t last = imu_history[0].stamp.toSec()*pow(10,6);
+                // std::cout<<"PRE YAW: "<<pre_yaw<<" , TIME: "<<pre_time<<"\n";
+                // std::cout<<"POST YAW: "<<post_yaw<<" , TIME: "<<post_time<<"\n";
+                // std::cout<<"k:"<<k<<std::endl;
+                // std::cout<<"PREDICT YAW: " << pred_yaw<<" , TIME: "<<timeStamp<<"\n";
                 return pred_yaw;
+            }
+
+            double getLatestYaw()
+            {
+                return imu_history[0].imu.yaw_angle;
             }
 
             float getPredPitch(int64_t timeStamp)
             {
                 int64_t post_time, pre_time;
                 float post_pitch, pre_pitch;
-                for(auto it=imu_history.begin(); it!=imu_history.end(); it++)
+                if(imu_history.size()<2)
                 {
-                    if((it->stamp).toSec() >= timeStamp)
+                    return imu_history[0].imu.pitch_angle;
+                }
+                if((imu_history[0].stamp).toSec()*pow(10,6) <= timeStamp)
+                {
+                    post_pitch = imu_history[0].imu.pitch_angle;
+                    post_time = imu_history[0].stamp.toSec()*pow(10,6);
+                    pre_pitch = imu_history[1].imu.pitch_angle;
+                    pre_time = imu_history[1].stamp.toSec()*pow(10,6);
+                }
+                else
+                {
+                    for(auto it=imu_history.begin(); it!=imu_history.end(); it++)
                     {
-                        post_pitch = (*it).imu.pitch_angle;
-                        post_time = (*it).stamp.toSec();
-                    }
-                    else
-                    {
-                        pre_pitch = (*it).imu.pitch_angle;
-                        pre_time = (*it).stamp.toSec();
-                        break;
+                        if((it->stamp).toSec()*pow(10,6) >= timeStamp)
+                        {
+                            post_pitch = (*it).imu.pitch_angle;
+                            post_time = (*it).stamp.toSec()*pow(10,6);
+                        }
+                        else
+                        {
+                            pre_pitch = (*it).imu.pitch_angle;
+                            pre_time = (*it).stamp.toSec()*pow(10,6);
+                            break;
+                        }
                     }
                 }
-                
                 float k = (post_pitch-pre_pitch)/float(post_time-pre_time);
                 return pre_pitch + k*(timeStamp-pre_time);
             }
@@ -154,6 +186,7 @@ namespace armor
         bool find_enemy;
         bool shoot_enemy;
         int cur_frame;
+        IMUBuff* imu_buff;
     public:
         explicit Attack(ImageShowClient &isClient, PID &pid) : m_pid(pid),
                                                                m_is(isClient),
@@ -163,6 +196,8 @@ namespace armor
             m_isUseDialte = stConfig.get<bool>("auto.is-dilate");
             listener = new tf::TransformListener;
             cur_frame=0;
+            imu_buff = new IMUBuff();
+
             // fs.open("data.csv");
         }
         ~Attack()
@@ -583,7 +618,7 @@ namespace armor
         void gimbal_excute(ros::Publisher& gimbalPub,double pitch,double yaw)
         {
             roborts_msgs::GimbalAngle gimbalAngle;
-            gimbalAngle.yaw_mode = 0;
+            gimbalAngle.yaw_mode = 1;
             gimbalAngle.pitch_mode = 0;
             gimbalAngle.yaw_angle = yaw;
             gimbalAngle.pitch_angle = pitch;
@@ -621,14 +656,14 @@ namespace armor
          * @func 主运行函数
          * @return true
          */
-        bool run(cv::Mat &src, int64_t timeStamp, double gYaw, double gPitch,image_transport::Publisher& resultPub,ros::Publisher& gimbalPub, ros::Publisher& messpub,ros::ServiceClient& img_client, int pmode)
+        bool run(cv::Mat &src,const ros::Time& image_timeStamp, double gYaw, double gPitch,image_transport::Publisher& resultPub,ros::Publisher& gimbalPub, ros::Publisher& messpub,ros::ServiceClient& img_client, int pmode)
         {
-            IMUBuff imu_buff = IMUBuff();
             find_enemy = false;
             shoot_enemy = false;
             /* 1.初始化参数，判断是否启用ROI */
             m_bgr_raw = src;
             m_bgr = src;
+            int64_t timeStamp = image_timeStamp.toSec()*pow(10,6);
             m_currentTimeStamp = timeStamp;
             m_targets.clear();
             m_preTargets.clear();
@@ -690,7 +725,6 @@ namespace armor
                     if (statusA == SEND_STATUS_AUTO_AIM)
                     {   /* 获取世界坐标点 */
                         /* 转换为云台坐标点 */
-                        find_enemy = true;
                         get_gimbal(gPitch,gYaw);
                         // m_communicator.getGlobalAngle(&gYaw, &gPitch);
                         s_historyTargets[0].convert2WorldPts(-gYaw, gPitch);
@@ -745,6 +779,11 @@ namespace armor
                     find_enemy=false;
                     return false;
                 }
+                else
+                {
+                    find_enemy = true;
+
+                }
                 
                         // m_communicator.getGlobalAngle(&gYaw, &gPitch);
                 s_historyTargets[0].convert2WorldPts(-gYaw, gPitch);
@@ -761,18 +800,18 @@ namespace armor
                 /* 6.射击策略 */
                 if (s_historyTargets.size() >= 3 &&
                     cv::abs(s_historyTargets[1].ptsInGimbal.x) < 100.0)
-		{
-		    shoot_enemy=true;
-                    statusA = SEND_STATUS_AUTO_SHOOT;   //射击
-		}
-		m_is.addText(cv::format("ptsInGimbal: %2.3f %2.3f %2.3f",
-                                        s_historyTargets[0].ptsInGimbal.x / 1000.0,
-                                        s_historyTargets[0].ptsInGimbal.y / 1000.0,
-                                        s_historyTargets[0].ptsInGimbal.z / 1000.0));
-                m_is.addText(cv::format("rPitch %.3f", rPitch));
-                m_is.addText(cv::format("rYaw   %.3f", rYaw* M_PI / (180.0)));
-                m_is.addText(cv::format("gYaw   %.3f", gYaw* M_PI / (180.0)));
-                m_is.addText(cv::format("rYaw + gYaw   %.3f", (rYaw + gYaw)* M_PI / (180.0)));
+                {
+                    shoot_enemy=true;
+                            statusA = SEND_STATUS_AUTO_SHOOT;   //射击
+                }
+                m_is.addText(cv::format("ptsInGimbal: %2.3f %2.3f %2.3f",
+                                                s_historyTargets[0].ptsInGimbal.x / 1000.0,
+                                                s_historyTargets[0].ptsInGimbal.y / 1000.0,
+                                                s_historyTargets[0].ptsInGimbal.z / 1000.0));
+                        m_is.addText(cv::format("rPitch %.3f", rPitch));
+                        m_is.addText(cv::format("rYaw   %.3f", rYaw* M_PI / (180.0)));
+                        m_is.addText(cv::format("gYaw   %.3f", gYaw* M_PI / (180.0)));
+                        m_is.addText(cv::format("rYaw + gYaw   %.3f", (rYaw + gYaw)* M_PI / (180.0)));
             }
             /* 7.通过PID对yaw进行修正（参数未修改） */
             
@@ -787,8 +826,10 @@ namespace armor
             // newYaw=newYaw* M_PI / (180.0);
             // rPitch=rPitch;
             rYaw=rYaw* M_PI / (180.0);
-            //gYaw=gYaw* M_PI / (180.0);
-            float gYaw_pred = imu_buff.getPredYaw(timeStamp);
+            gYaw=gYaw* M_PI / (180.0);
+            double gYaw_pred = imu_buff->getPredYaw(timeStamp);
+            double latestYaw = imu_buff->getLatestYaw();
+            // std::cout<<gYaw_pred-gYaw<<std::endl;
             float send_Yaw =gYaw_pred+rYaw;
             sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
             resultPub.publish(*msg);
@@ -800,21 +841,19 @@ namespace armor
             enemy_data.pose.pose.orientation.w=1;
             enemy_data.pose.header.seq=cur_frame++;
             enemy_data.pose.header.stamp=ros::Time::now();
-	    enemy_data.pose.header.frame_id = "/base_link";
+	        enemy_data.pose.header.frame_id = "/base_link";
             enemy_data.if_enemy=find_enemy;
             if(find_enemy){
                 enemy_data.pose.pose.position.x=s_historyTargets[0].ptsInWorld.x;
                 enemy_data.pose.pose.position.y=s_historyTargets[0].ptsInWorld.y;
                 enemy_data.pose.pose.position.z=s_historyTargets[0].ptsInWorld.z;
-                enemy_data.G_angle.yaw_angle=rYaw;
+                enemy_data.G_angle.yaw_angle=send_Yaw;
                 enemy_data.G_angle.pitch_angle=rPitch;
                 enemy_data.id = s_historyTargets[0].id;
-                enemy_data.pose.header.stamp.sec = timeStamp;
+                enemy_data.pose.header.stamp = image_timeStamp;
                 enemy_data.color = mode;    //红蓝模式,yaml文件中读出
             }
-
-        
-            gimbal_excute(gimbalPub,rPitch,send_Yaw);
+            // gimbal_excute(gimbalPub,rPitch,send_Yaw);
             // if(statusA == SEND_STATUS_AUTO_SHOOT){
             //    ros::NodeHandle ros_nh;
             //    ros::ServiceClient attack_client = ros_nh.serviceClient<roborts_msgs::ShootCmd>("cmd_shoot");

@@ -57,15 +57,14 @@ class rosDetect
         {
             ros::Time start = ros::Time::now();
             cv_bridge::CvImagePtr Image = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_8UC3);
-            int64_t timestamp = ros::Time::now().toSec()*pow(10,6);
-
+            int64_t timestamp = start.toSec()*pow(10,6);
             isClientPtr->update(Image->image, int(timestamp / 1000));
             double pitch,yaw;
             get_gimbal(pitch,yaw);
             if(!armor::stCamera.cameraInfo_set){
                 return;
             }
-            attackPtr->run(Image->image,timestamp,yaw,pitch,resultPub,gimbalPub,messpub,img_client,1);
+            attackPtr->run(Image->image,msg->header.stamp,yaw,pitch,resultPub,gimbalPub,messpub,img_client,1);
         }
 
         void get_gimbal(double& pitch,double& yaw)
