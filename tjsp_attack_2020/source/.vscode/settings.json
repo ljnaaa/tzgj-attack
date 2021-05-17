@@ -4,7 +4,8 @@
         "/opt/ros/melodic/lib/python2.7/dist-packages"
     ],
     "files.associations": {
-        "*.tcc": "cpp"
+        "*.tcc": "cpp",
+        "*.ipp": "cpp"
     },
     "python.analysis.extraPaths": [
         "/home/icra01/icra/devel/lib/python2.7/dist-packages",
