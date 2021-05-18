@@ -28,6 +28,7 @@
 // 多车版本
 #include <roborts_msgs/single_car.h>
 #include <roborts_msgs/visual_detection.h>
+#include <roborts_msgs/GimbalFb.h>
 //传递图片信息的srv文件
 #include "tjsp_attack_2020/img.h" 
 
@@ -59,7 +60,6 @@ namespace armor
     std::atomic<int64_t> AttackBase::s_latestTimeStamp(0);
     std::deque<Target> AttackBase::s_historyTargets;
     Kalman AttackBase::kalman;
-<<<<<<< HEAD
 
     class IMUBuff
     {
@@ -70,19 +70,13 @@ namespace armor
             
             IMUBuff()
             {
-<<<<<<< HEAD
                 ros::NodeHandle imu_n_;
-=======
->>>>>>> 29dfa351221ff3e9551391f74f776775ac76b050
                 imu_sub = imu_n_.subscribe("gimbal_feedback", 1, &IMUBuff::storeIMUHistory, this);
             }
 
             void storeIMUHistory(const roborts_msgs::GimbalFb::ConstPtr &fb)
             {
-<<<<<<< HEAD
                 //std::cout<<"aaaaaaaaaaaaaaaaaa"<<std::endl;
-=======
->>>>>>> 29dfa351221ff3e9551391f74f776775ac76b050
                 while(imu_history.size() >= LEN) imu_history.pop_back();
                 imu_history.push_front(*fb);
             }
@@ -93,7 +87,6 @@ namespace armor
                 double post_yaw, pre_yaw;
                 if(imu_history.size()<2)
                 {
-<<<<<<< HEAD
                     return imu_history[0].imu.yaw_angle;
                 }
                 if((imu_history[0].stamp).toSec()*pow(10,6) <= timeStamp)
@@ -127,28 +120,6 @@ namespace armor
                 // std::cout<<"POST YAW: "<<post_yaw<<" , TIME: "<<post_time<<"\n";
                 // std::cout<<"k:"<<k<<std::endl;
                 // std::cout<<"PREDICT YAW: " << pred_yaw<<" , TIME: "<<timeStamp<<"\n";
-=======
-                    if((it->stamp).toSec() >= timeStamp)
-                    {
-                        post_yaw = (*it).imu.yaw_angle;
-                        post_time = (*it).stamp.toSec();
-                    }
-                    else
-                    {
-                        pre_yaw = (*it).imu.yaw_angle;
-                        pre_time = (*it).stamp.toSec();
-                        break;
-                    }
-                }
-                float k = (post_yaw-pre_yaw)/float(post_time-pre_time);
-                float pred_yaw = pre_yaw + k*(timeStamp-pre_time);
-                
-                
-                std::cout<<"PRE YAW: "<<post_yaw<<" , TIME: "<<pre_time<<"\n";
-                std::cout<<"POST YAW: "<<pre_yaw<<" , TIME: "<<post_time<<"\n";
-                std::cout<<"PREDICT YAW: " << pred_yaw<<" , TIME: "<<timeStamp<<"\n";
-                
->>>>>>> 29dfa351221ff3e9551391f74f776775ac76b050
                 return pred_yaw;
             }
 
@@ -163,7 +134,6 @@ namespace armor
                 float post_pitch, pre_pitch;
                 if(imu_history.size()<2)
                 {
-<<<<<<< HEAD
                     return imu_history[0].imu.pitch_angle;
                 }
                 if((imu_history[0].stamp).toSec()*pow(10,6) <= timeStamp)
@@ -188,18 +158,6 @@ namespace armor
                             pre_time = (*it).stamp.toSec()*pow(10,6);
                             break;
                         }
-=======
-                    if((it->stamp).toSec() >= timeStamp)
-                    {
-                        post_pitch = (*it).imu.pitch_angle;
-                        post_time = (*it).stamp.toSec();
-                    }
-                    else
-                    {
-                        pre_pitch = (*it).imu.pitch_angle;
-                        pre_time = (*it).stamp.toSec();
-                        break;
->>>>>>> 29dfa351221ff3e9551391f74f776775ac76b050
                     }
                 }
                 float k = (post_pitch-pre_pitch)/float(post_time-pre_time);
@@ -209,8 +167,6 @@ namespace armor
     };
 
 
-=======
->>>>>>> 48c934623e6299f5e05675290424a5c06add4777
 /*
   自瞄主类
  */
@@ -708,7 +664,6 @@ namespace armor
          */
         bool run(cv::Mat &src,const ros::Time& image_timeStamp, double gYaw, double gPitch,image_transport::Publisher& resultPub,ros::Publisher& gimbalPub, ros::Publisher& messpub,ros::ServiceClient& img_client, int pmode)
         {
-            IMUBuff imu_buff = IMUBuff();
             find_enemy = false;
             shoot_enemy = false;
             /* 1.初始化参数，判断是否启用ROI */
@@ -850,11 +805,10 @@ namespace armor
                 rPitch = s_historyTargets[0].rPitch;
                 /* 6.射击策略 */
                 if (s_historyTargets.size() >= 3 &&
-<<<<<<< HEAD
                     cv::abs(s_historyTargets[1].ptsInGimbal.x) < 100.0)
                 {
                     shoot_enemy=true;
-                            statusA = SEND_STATUS_AUTO_SHOOT;   //射击
+                    statusA = SEND_STATUS_AUTO_SHOOT;   //射击
                 }
                 m_is.addText(cv::format("ptsInGimbal: %2.3f %2.3f %2.3f",
                                                 s_historyTargets[0].ptsInGimbal.x / 1000.0,
@@ -864,23 +818,6 @@ namespace armor
                         m_is.addText(cv::format("rYaw   %.3f", rYaw* M_PI / (180.0)));
                         m_is.addText(cv::format("gYaw   %.3f", gYaw* M_PI / (180.0)));
                         m_is.addText(cv::format("rYaw + gYaw   %.3f", (rYaw + gYaw)* M_PI / (180.0)));
-=======
-                    cv::abs(s_historyTargets[0].ptsInShoot.z) < 250.0 &&
-                    cv::abs(s_historyTargets[0].ptsInShoot.z) > 100.0 &&
-                    cv::abs(s_historyTargets[0].ptsInShoot.x) < 70.0 &&
-                    cv::abs(s_historyTargets[0].ptsInShoot.y) < 60.0 &&
-                    cv::abs(s_historyTargets[1].ptsInShoot.x) < 120.0 && cv::abs(s_historyTargets[1].ptsInShoot.y) < 90.0)
-                    shoot_enemy=true;
-                    statusA = SEND_STATUS_AUTO_SHOOT;   //射击
-                m_is.addText(cv::format("ptsInGimbal: %2.3f %2.3f %2.3f",
-                                        s_historyTargets[0].ptsInGimbal.x / 1000.0,
-                                        s_historyTargets[0].ptsInGimbal.y / 1000.0,
-                                        s_historyTargets[0].ptsInGimbal.z / 1000.0));
-                m_is.addText(cv::format("rPitch %.3f", rPitch));
-                m_is.addText(cv::format("rYaw   %.3f", rYaw* M_PI / (180.0)));
-                m_is.addText(cv::format("gYaw   %.3f", gYaw* M_PI / (180.0)));
-                m_is.addText(cv::format("rYaw + gYaw   %.3f", (rYaw + gYaw)* M_PI / (180.0)));
->>>>>>> 29dfa351221ff3e9551391f74f776775ac76b050
             }
             /* 7.通过PID对yaw进行修正（参数未修改） */
             
@@ -895,27 +832,16 @@ namespace armor
             // newYaw=newYaw* M_PI / (180.0);
             // rPitch=rPitch;
             rYaw=rYaw* M_PI / (180.0);
-<<<<<<< HEAD
             gYaw=gYaw* M_PI / (180.0);
             double gYaw_pred = imu_buff->getPredYaw(timeStamp);
             double latestYaw = imu_buff->getLatestYaw();
-            // std::cout<<gYaw_pred-gYaw<<std::endl;
-=======
-<<<<<<< HEAD
-            //gYaw=gYaw* M_PI / (180.0);
-            float gYaw_pred = imu_buff.getPredYaw(timeStamp);
->>>>>>> 29dfa351221ff3e9551391f74f776775ac76b050
             float send_Yaw =gYaw_pred+rYaw;
-=======
-            gYaw=gYaw* M_PI / (180.0);
-            float send_Yaw =gYaw+rYaw;
->>>>>>> 48c934623e6299f5e05675290424a5c06add4777
             sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
             resultPub.publish(*msg);
             // if(cv::abs(newYaw - gYaw)>0.1)
 
             roborts_msgs::visual_detection vision_data;
-            vision_data.G_angle.yaw_angle=rYaw;
+            vision_data.G_angle.yaw_angle=send_Yaw;
             vision_data.G_angle.pitch_angle=rPitch;
             vision_data.if_enemy=find_enemy;
             if(shoot_enemy){
@@ -989,13 +915,7 @@ namespace armor
                 enemy_data.pose.header.stamp = image_timeStamp;
                 enemy_data.color = mode;    //红蓝模式,yaml文件中读出
             }
-<<<<<<< HEAD
             // gimbal_excute(gimbalPub,rPitch,send_Yaw);
-=======
-            */
-        
-            gimbal_excute(gimbalPub,rPitch,send_Yaw);
->>>>>>> 29dfa351221ff3e9551391f74f776775ac76b050
             // if(statusA == SEND_STATUS_AUTO_SHOOT){
             //    ros::NodeHandle ros_nh;
             //    ros::ServiceClient attack_client = ros_nh.serviceClient<roborts_msgs::ShootCmd>("cmd_shoot");
