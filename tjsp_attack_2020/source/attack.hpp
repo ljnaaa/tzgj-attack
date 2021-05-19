@@ -19,11 +19,12 @@
 #include <cv_bridge/cv_bridge.h>
 #include <tf/transform_listener.h>
 #include <roborts_msgs/ShootCmd.h>
+#include <nav_msgs/Odometry.h>
+#include <tf/tf.h>
 #define debugit std::cout<<__LINE__<<std::endl;
 //#include <roborts_msgs/Mess.h>
 
-// 单车版本
-#include <roborts_msgs/test.h>
+
 
 // 多车版本
 #include <roborts_msgs/single_car.h>
@@ -163,6 +164,81 @@ namespace armor
                 float k = (post_pitch-pre_pitch)/float(post_time-pre_time);
                 return pre_pitch + k*(timeStamp-pre_time);
             }
+    };
+
+    class OdomBuff
+    {
+        public:
+            OdomBuff()
+            {
+                ros::NodeHandle n;
+                odom_sub = n.subscribe("odom",1,&OdomBuff::odom_cb,this);
+            }
+
+            void pose_judge(cv::Point3d& inchassis)
+            {
+                double delta_yaw = transform(last_frame,standard);
+                            /* yaw 为绕y轴旋转的 */
+                std::cout<<"delta"<<delta_yaw<<std::endl;
+                m_rotY = (cv::Mat_<double>(3, 3)
+                          << std::cos(delta_yaw), 0, std::sin(delta_yaw),
+                            0, 1, 0,
+                            -std::sin(delta_yaw),0, std::cos(delta_yaw));
+                cv::Mat _pts = (cv::Mat_<double>(3, 1) << inchassis.x, inchassis.y, inchassis.z);
+                cv::Mat ptsInWorldMat = m_rotY * _pts;
+                inchassis.x = ptsInWorldMat.at<double>(0);
+                inchassis.y = ptsInWorldMat.at<double>(1);
+                inchassis.z = ptsInWorldMat.at<double>(2);
+            }
+
+            void transback(cv::Point3d& inworld)
+            {
+                cv::Mat _pts = (cv::Mat_<double>(3, 1) << inworld.x, inworld.y, inworld.z);
+                cv::Mat ptsInWorldMat = m_rotY.inv() * _pts;
+                inworld.x = ptsInWorldMat.at<double>(0);
+                inworld.y = ptsInWorldMat.at<double>(1);
+                inworld.z = ptsInWorldMat.at<double>(2);
+            }
+
+            void reset_standard()
+            {
+                standard = last_frame;
+            }
+
+        private:
+            nav_msgs::Odometry last_frame;
+            nav_msgs::Odometry standard;    //standard pose of one kalman filter
+            ros::Subscriber odom_sub;
+            cv::Mat m_rotY;
+
+            ~OdomBuff(){}
+            
+            void odom_cb(const nav_msgs::Odometry::ConstPtr& msg)
+            {
+                last_frame = *msg;
+            }
+
+            double transform(nav_msgs::Odometry& last,nav_msgs::Odometry&standard)
+            {
+                double last_yaw = orien2yaw(last_frame);
+                double standard_yaw = orien2yaw(standard);
+                return standard_yaw - last_yaw;   //I don't know why need to negative
+            }
+
+            double orien2yaw(nav_msgs::Odometry& frame)
+            {
+                tf::Quaternion quat;
+                tf::quaternionMsgToTF(frame.pose.pose.orientation,quat);
+                
+                double roll,pitch,yaw;
+                tf::Matrix3x3(quat).getRPY(roll,pitch,yaw);
+                return yaw;
+            }
+
+            
+
+
+
 
     };
 
@@ -193,6 +269,7 @@ namespace armor
         bool shoot_enemy;
         int cur_frame;
         IMUBuff* imu_buff;
+        OdomBuff* odom_buff;
     public:
         explicit Attack(ImageShowClient &isClient, PID &pid) : m_pid(pid),
                                                                m_is(isClient),
@@ -203,6 +280,7 @@ namespace armor
             listener = new tf::TransformListener;
             cur_frame=0;
             imu_buff = new IMUBuff();
+            odom_buff = new OdomBuff();
 
             // fs.open("data.csv");
         }
@@ -213,6 +291,7 @@ namespace armor
         void setMode(bool colorMode) { mode = colorMode; }
 
     private:
+
     /**
      * @name m_preDetect
      * @func 通过hsv筛选和进行预处理获得装甲板
@@ -737,9 +816,14 @@ namespace armor
                         cout << "s_historyTargets[0].ptsInWorld : " << s_historyTargets[0].ptsInWorld << endl;
                         /* 卡尔曼滤波初始化/参数修正 */
                         if (s_historyTargets.size() == 1)
+                        {
+                            odom_buff->reset_standard();
+                            odom_buff->pose_judge(s_historyTargets[0].ptsInWorld);
                             kalman.clear_and_init(s_historyTargets[0].ptsInWorld, timeStamp);
+                        }
                         else
                         {
+                            odom_buff->pose_judge(s_historyTargets[0].ptsInWorld);
                             kalman.correct(s_historyTargets[0].ptsInWorld, timeStamp);
                         }
                     }
@@ -754,9 +838,12 @@ namespace armor
                     {
                         
                         kalman.predict(0.1, s_historyTargets[0].ptsInWorld_Predict);
+                        odom_buff->transback(s_historyTargets[0].ptsInWorld_Predict);
+                        odom_buff->transback(kalman.velocity);
                         /* 转换为云台坐标点 */
                         s_historyTargets[0].convert2GimbalPts(kalman.velocity);
                         
+                        std::cout<<s_historyTargets[0].ptsInWorld_Predict<<std::endl;
                         m_is.addText(cv::format("vx %4.0f", s_historyTargets[0].vInGimbal3d.x));
                         m_is.addText(cv::format("vy %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.y)));
                         m_is.addText(cv::format("vz %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.z)));
