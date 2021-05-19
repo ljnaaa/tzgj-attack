@@ -461,7 +461,7 @@ namespace armor
                 img_client.call(srv);
 
                 // 显示服务调用结果
-                ROS_INFO("Result : %d", srv.response.result);
+                // ROS_INFO("Result : %d", srv.response.result);
 
                 if (srv.response.result == 0 || srv.response.result == 1){
                     _tar.id = srv.response.result + 1;
@@ -511,7 +511,7 @@ namespace armor
             else
             {
                 /* case B: 之前选过打击目标了, 得找到一样的目标 */
-                PRINT_INFO("++++++++++++++++ 开始寻找上一次目标 ++++++++++++++++++++\n");
+                // PRINT_INFO("++++++++++++++++ 开始寻找上一次目标 ++++++++++++++++++++\n");
                 double distance = 0xffffffff;
                 int closestElementIndex = -1;
                 for (size_t i = 0; i < m_targets.size(); ++i)
@@ -522,7 +522,7 @@ namespace armor
                     /* 获取图像矩 */                                
                     cv::Moments m_1 = cv::moments(m_targets[i].pixelPts2f);
                     cv::Moments m_2 = cv::moments(s_historyTargets[0].pixelPts2f);   
-                    PRINT_WARN("distanceA = %f\n", distanceA);
+                    // PRINT_WARN("distanceA = %f\n", distanceA);
                     /* 进行matchShaoes的阈值限定，并保证归一化中心矩同号 */ 
                     // if (distanceA > 0.5 ||
                     //     (m_1.nu11 + m_1.nu30 + m_1.nu12) * (m_2.nu11 + m_2.nu30 + m_2.nu12) < 0)
@@ -533,7 +533,7 @@ namespace armor
                     {
                         /* 用绝对坐标距离计算 两次位置之差 */
                         distanceB = cv::norm(m_targets[i].ptsInWorld - s_historyTargets[0].ptsInWorld) / 2000.0;
-                        PRINT_WARN("distanceB = %f\n", distanceB);
+                        // PRINT_WARN("distanceB = %f\n", distanceB);
                         /* 进行阈值判定 */
                         if (distanceB > 0.5)
                             continue;
@@ -542,7 +542,7 @@ namespace armor
                     {
                         /* 用云台坐标系距离计算 两次位置之差 */
                         distanceB = cv::norm(m_targets[i].ptsInGimbal - s_historyTargets[0].ptsInGimbal) / 3400.0;
-                        PRINT_WARN("distanceB = %f\n", distanceB);
+                        // PRINT_WARN("distanceB = %f\n", distanceB);
                         /* 进行阈值判定 */
                         if (distanceB > 0.8)
                             continue;
@@ -734,7 +734,7 @@ namespace armor
                         get_gimbal(gPitch,gYaw);
                         // m_communicator.getGlobalAngle(&gYaw, &gPitch);
                         s_historyTargets[0].convert2WorldPts(-gYaw, gPitch);
-                        cout << "s_historyTargets[0].ptsInGimbal : " << s_historyTargets[0].ptsInWorld << endl;
+                        cout << "s_historyTargets[0].ptsInWorld : " << s_historyTargets[0].ptsInWorld << endl;
                         /* 卡尔曼滤波初始化/参数修正 */
                         if (s_historyTargets.size() == 1)
                             kalman.clear_and_init(s_historyTargets[0].ptsInWorld, timeStamp);
@@ -848,7 +848,7 @@ namespace armor
                 vision_data.if_shoot=shoot_enemy;
             }
             std::vector<roborts_msgs::single_car> temp;
-            vision_data.multicar = temp;
+
             /*
             single_car
             int32 id     #0:unknown
@@ -893,7 +893,9 @@ namespace armor
                     temp.emplace_back(mycar);
                 }
             }
-            
+            vision_data.multicar = temp;
+            messpub.publish(vision_data);
+
 
             /*
             roborts_msgs::test enemy_data;
@@ -924,7 +926,6 @@ namespace armor
             //    srv.request.number=1;
             //    attack_client.call(srv);
             // }
-            messpub.publish(vision_data);
             /* 9.发给电控 */
             // m_communicator.send(newYaw, rPitch, statusA, SEND_STATUS_WM_PLACEHOLDER);
             //  PRINT_INFO("[attack] send = %ld", timeStamp);
