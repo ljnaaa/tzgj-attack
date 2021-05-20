@@ -73,5 +73,9 @@
         "string_view": "cpp",
         "shared_mutex": "cpp",
         "variant": "cpp"
-    }
+    },
+    "python.analysis.extraPaths": [
+        "/home/icra01/icra/devel/lib/python2.7/dist-packages",
+        "/opt/ros/melodic/lib/python2.7/dist-packages"
+    ]
 }

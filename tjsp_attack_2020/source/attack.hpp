@@ -116,6 +116,10 @@ namespace armor
                 }
                 double k = (post_yaw-pre_yaw)/double(post_time-pre_time);
                 double pred_yaw = pre_yaw + k*(timeStamp-pre_time);
+                
+                while(pred_yaw > M_PI) pred_yaw -= M_PI;
+                while(pred_yaw < -M_PI) pred_yaw += M_PI;
+                
                 int64_t last = imu_history[0].stamp.toSec()*pow(10,6);
                 // std::cout<<"PRE YAW: "<<pre_yaw<<" , TIME: "<<pre_time<<"\n";
                 // std::cout<<"POST YAW: "<<post_yaw<<" , TIME: "<<post_time<<"\n";
@@ -162,7 +166,14 @@ namespace armor
                     }
                 }
                 float k = (post_pitch-pre_pitch)/float(post_time-pre_time);
-                return pre_pitch + k*(timeStamp-pre_time);
+                float pred_pitch = pre_pitch + k*(timeStamp-pre_time);
+                
+                while(pred_pitch > M_PI) pred_pitch -= M_PI;
+                while(pred_pitch < -M_PI) pred_pitch += M_PI;
+                
+                return pred_pitch;
+
+
             }
     };
 
