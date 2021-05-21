@@ -10,6 +10,15 @@
 #include "layers.hpp"
 #include <utility>
 #include "dirent.h"
+
+//CPP版本，导入tensorflow
+#include "tensorflow/core/framework/graph.pb.h"
+#include "tensorflow/core/public/session.h"
+#include "tensorflow/core/framework/tensor.h"
+#include "google/protobuf/wrappers.pb.h"
+#include "tensorflow/core/util/command_line_flags.h"
+
+
 #include "google/protobuf/wrappers.pb.h"
 #include <ros/ros.h>
 #include <fstream>
@@ -30,8 +39,18 @@
 #include <roborts_msgs/single_car.h>
 #include <roborts_msgs/visual_detection.h>
 #include <roborts_msgs/GimbalFb.h>
-//传递图片信息的srv文件
-#include "tjsp_attack_2020/img.h" 
+
+
+using tensorflow::string;
+using tensorflow::Tensor;
+using namespace tensorflow;
+
+//模型路径
+const string model_path = "/home/icra01/icra/src/tzgj-attack/tjsp_attack_2020/Model/happyModel.pb";
+/*输入输出节点*/
+const string input_name = "conv2d_9_input:0";
+const string output_name = "dense_7/Softmax:0"; 
+#define debugit std::cout<<__LINE__<<std::endl;
 
 
 namespace armor
@@ -279,6 +298,9 @@ namespace armor
         IMUBuff* imu_buff;
         OdomBuff* odom_buff;
         roborts_msgs::visual_detection last_vision_data;
+        Session *session;
+        Tensor input;
+
     public:
         explicit Attack(ImageShowClient &isClient, PID &pid) : m_pid(pid),
                                                                m_is(isClient),
@@ -291,10 +313,21 @@ namespace armor
             imu_buff = new IMUBuff();
             odom_buff = new OdomBuff();
 
+            //C++ tensorflow
+            /* 创建session */
+            Status status = NewSession(SessionOptions(), &session);
+            if (!status.ok())
+                std::cout << status.ToString() << std::endl;
+            /* 初始化session */
+            input = init_my_tf(session);
+
             // fs.open("data.csv");
         }
         ~Attack()
         {
+            session->Close();
+            delete session;
+
             // fs.close();
         }
         void setMode(bool colorMode) { mode = colorMode; }
@@ -431,6 +464,21 @@ namespace armor
         }
         int m_cropNameCounter = 0;
 
+
+        /**
+         * @name mat2Tensor
+         * @param image 图片
+         * @param t tensor
+         * @func 将图片从mat转化为tensor
+         */ 
+        void mat2Tensor(cv::Mat &image, Tensor &t)
+        {
+            float *tensor_data_ptr = t.flat<float>().data();
+            cv::Mat fake_mat(image.rows, image.cols, CV_32FC(image.channels()), tensor_data_ptr);
+            image.convertTo(fake_mat, CV_32FC(image.channels()));
+        }
+
+
         /**
          * @name getThreshold
          * @param mat 图片
@@ -503,12 +551,36 @@ namespace armor
             return true;
         }
 
+
+        /**
+         * @name init_my_tf
+         * @param session 交互接口
+         * @func 读取模型并设置到session中
+         * @return input
+         */ 
+        inline Tensor init_my_tf(Session *session)
+        {
+            /* 从pb文件中读取模型 */
+            GraphDef graph_def;
+            Status status = ReadBinaryProto(Env::Default(), model_path, &graph_def);  //读取Graph, 如果是文本形式的pb,使用ReadTextProto
+            if (!status.ok())
+                std::cout << status.ToString() << std::endl;
+
+            /* 将模型设置到创建的Session里 */
+            status = session->Create(graph_def);
+            if (!status.ok())
+                std::cout << status.ToString() << std::endl;
+
+            Tensor input(DT_FLOAT, TensorShape({1, fixedSize, fixedSize, 1}));
+            return input;
+        }
+
         /**
          * @name m_classify_single_tensor
          * @param isSave 是否保存样本图片
          * @func 魔改后的分类器节点
          */ 
-        void m_classify_single_tensor(ros::ServiceClient& img_client,bool isSave = false)
+        void m_classify_single_tensor(bool isSave = false)
         {
             if (m_preTargets.empty())
                 return;
@@ -516,45 +588,62 @@ namespace armor
             {
                 // ros::Time pretime=ros::Time::now();
                 cv::Rect tmp = cv::boundingRect(_tar.pixelPts2f_Ex);
-                cv::Mat image = m_bgr_raw(tmp).clone();
+                cv::Mat tmp2 = m_bgr_raw(tmp).clone();
 
-                // 创建节点句柄
-                ros::NodeHandle n;
 
+                                /* 将图片变成目标大小 */
+                cv::Mat transMat = cv::getPerspectiveTransform(_tar.pixelPts2f_Ex,
+                                                               _tar.pixelPts2f_Ex);
+                cv::Mat _crop;
+
+                /* 投影变换 */
+                cv::warpPerspective(tmp2, _crop, transMat, cv::Size(tmp2.size())); 
+                /* 转灰度图 */
+                cv::cvtColor(_crop, _crop, cv::COLOR_BGR2GRAY);
+                /* 储存图 */
                 if (isSave)
                 {
-                    cv::imwrite(cv::format("/home/icra01/images/%d.png", m_cropNameCounter++), image);
+                    cv::imwrite(cv::format("/home/icra01/images/%d.png", m_cropNameCounter++), _crop);
                 }
-                
-                std::vector<uchar> img;
-                uchar* pxvec=image.ptr<uchar>(0);
-                //遍历访问Mat中各个像素值
-                for (int i = 0; i < image.rows; i++)
+
+                cv::Mat image;
+
+                if (loadAndPre(_crop, image))
                 {
-                    pxvec = image.ptr<uchar>(i);
-                    //三通道数据都在第一行依次排列，按照BGR顺序
-                    for (int j = 0; j < image.cols*image.channels(); j++)
+                    // cv::imshow("image",image);
+                    // cv::waitKey(1);
+                    /* mat转换为tensor */
+                    mat2Tensor(image, input);
+                    /* 保留最终输出 */
+                    std::vector<tensorflow::Tensor> outputs;
+                    /* 计算最后结果 */
+                    ros::Time pretime1=ros::Time::now();
+                    TF_CHECK_OK(session->Run({std::pair<string, Tensor>(input_name, input)}, {output_name}, {}, &outputs));
+                    std::cout<<"classify:"<<ros::Time::now()-pretime1<<std::endl;
+                    /* 获取输出 */
+
+                    Tensor t = outputs[0];                   // Fetch the first tensor
+                    auto tmap = t.tensor<float, 2>();        // Tensor Shape: [batch_size, target_class_num]
+                    int output_dim = t.shape().dim_size(1);  // Get the target_class_num from 1st dimension
+
+                    // Argmax: Get Final Prediction Label and Probability
+                    int output_class_id = -1;
+                    double output_prob = 0.0;
+                    for (int j = 0; j < output_dim; j++)
                     {
-                        img.emplace_back(uint(pxvec[j]));
+                        cout << "Class " << j << " prob:" << tmap(0, j) << "," << std::endl;
+                        if (tmap(0, j) >= output_prob) {
+                            output_class_id = j;
+                            output_prob = tmap(0, j);
+                        }
+                    }
+                    if (output_class_id == 0 || output_class_id == 1){
+                        _tar.id = output_class_id + 1;
+                        m_targets.emplace_back(_tar);
                     }
                 }
-
-                // 初始化test::img的请求数据
-                tjsp_attack_2020::img srv;
-                srv.request.height = image.rows;
-                srv.request.width = image.cols;
-                srv.request.channels = image.channels();
-                srv.request.img = img;
-
-                img_client.call(srv);
-
-                // 显示服务调用结果
-                // ROS_INFO("Result : %d", srv.response.result);
-
-                if (srv.response.result == 0 || srv.response.result == 1){
-                    _tar.id = srv.response.result + 1;
-                    m_targets.emplace_back(_tar);
-                }
+                else
+                    continue;
             }
             m_is.addClassifiedTargets("After Classify", m_targets);
             DEBUG("m_classify end")
@@ -750,7 +839,7 @@ namespace armor
          * @func 主运行函数
          * @return true
          */
-        bool run(cv::Mat &src,const ros::Time& image_timeStamp, double gYaw, double gPitch,image_transport::Publisher& resultPub,ros::Publisher& gimbalPub, ros::Publisher& messpub,ros::ServiceClient& img_client, int pmode)
+        bool run(cv::Mat &src,const ros::Time& image_timeStamp, double gYaw, double gPitch,image_transport::Publisher& resultPub,ros::Publisher& gimbalPub, ros::Publisher& messpub,int pmode = 1)
         {
             /* 1.初始化参数，判断是否启用ROI */
             m_bgr_raw = src;
@@ -785,7 +874,7 @@ namespace armor
             {
                 m_preDetect(pmode);
                 m_is.clock("m_classify");
-                m_classify_single_tensor(img_client,0); 
+                m_classify_single_tensor(0); 
                 m_is.clock("m_classify");
             }
 
