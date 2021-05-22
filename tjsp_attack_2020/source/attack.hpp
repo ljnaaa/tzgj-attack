@@ -299,7 +299,6 @@ namespace armor
         OdomBuff* odom_buff;
         roborts_msgs::visual_detection last_vision_data;
         Session *session;
-        Tensor input;
 
     public:
         explicit Attack(ImageShowClient &isClient, PID &pid) : m_pid(pid),
@@ -319,7 +318,7 @@ namespace armor
             if (!status.ok())
                 std::cout << status.ToString() << std::endl;
             /* 初始化session */
-            input = init_my_tf(session);
+            init_my_tf(session);
 
             // fs.open("data.csv");
         }
@@ -471,6 +470,7 @@ namespace armor
          * @param t tensor
          * @func 将图片从mat转化为tensor
          */ 
+         /*
         void mat2Tensor(cv::Mat &image, Tensor &t)
         {
             float *tensor_data_ptr = t.flat<float>().data();
@@ -478,6 +478,7 @@ namespace armor
             image.convertTo(fake_mat, CV_32FC(image.channels()));
         }
 
+        */
 
         /**
          * @name getThreshold
@@ -556,9 +557,9 @@ namespace armor
          * @name init_my_tf
          * @param session 交互接口
          * @func 读取模型并设置到session中
-         * @return input
+         * @return None
          */ 
-        inline Tensor init_my_tf(Session *session)
+        inline void init_my_tf(Session *session)
         {
             /* 从pb文件中读取模型 */
             GraphDef graph_def;
@@ -570,9 +571,36 @@ namespace armor
             status = session->Create(graph_def);
             if (!status.ok())
                 std::cout << status.ToString() << std::endl;
+        }
 
-            Tensor input(DT_FLOAT, TensorShape({1, fixedSize, fixedSize, 1}));
-            return input;
+        
+        /**
+         * @name Mat2Tensor
+         * @param img_temp 图片向量
+         * @param input 计算图的输入张量
+         * @func 将图片向量转化为tensor，加速运算
+         */ 
+        void Mat2Tensor(std::vector<cv::Mat>& img_temp, Tensor& input, int& size){
+
+            auto input_tensor_mapped = input.tensor<float, 4>();
+
+            int i = 0;
+            for(cv::Mat& img : img_temp)
+            {
+                float *source_data = (float *)img.data;
+                for (int y = 0; y < fixedSize; ++y)
+                {
+                    float *source_row = source_data + y * fixedSize;
+                    for (int x = 0; x < fixedSize; ++x)
+                    {
+                        float *source_pixel = source_row + x;
+
+                        input_tensor_mapped(i, y, x, 0) = float(*source_pixel);
+                    }
+                }
+                i++;
+            }
+
         }
 
         /**
@@ -584,6 +612,9 @@ namespace armor
         {
             if (m_preTargets.empty())
                 return;
+            std::vector<cv::Mat> img_temp;
+            std::vector<int> seq_temp;
+            int i = 0;
             for (auto &_tar : m_preTargets)
             {
                 // ros::Time pretime=ros::Time::now();
@@ -606,44 +637,52 @@ namespace armor
                     cv::imwrite(cv::format("/home/icra01/images/%d.png", m_cropNameCounter++), _crop);
                 }
 
-                cv::Mat image;
+                img_temp.emplace_back(_crop);
+                    //因为最后要押的是Target，而不是cv::Mar，故需要记录一一对应的序号
+                seq_temp.emplace_back(i);
 
-                if (loadAndPre(_crop, image))
+                i++;
+            }
+            int size = img_temp.size();
+            //cout << (size == seq_temp.size());
+            if(size == 0){
+                return ;
+            }
+            Tensor input(DT_FLOAT, TensorShape({size, fixedSize, fixedSize, 1}));
+
+            Mat2Tensor(img_temp, input, size);
+
+            std::vector<tensorflow::Tensor> outputs;
+
+            /* 计算最后结果 */
+            ros::Time pretime1=ros::Time::now();
+
+            TF_CHECK_OK(session->Run({std::pair<string, Tensor>(input_name, input)}, {output_name}, {}, &outputs));
+            
+            Tensor t;
+            //cout << (outputs.size() == size) << endl;
+            cout << outputs[0].shape() << "," << size << endl;
+            t = outputs[0];                   // 找tensor
+
+            auto tmap = t.tensor<float, 2>();        // Tensor Shape: [batch_size, target_class_num]
+            int output_dim = t.shape().dim_size(1);  // Get the target_class_num from 1st dimension
+            for(int i = 0; i < size; ++i){
+                // Argmax: Get Final Prediction Label and Probability
+                int output_class_id = -1;
+                double output_prob = 0.0;
+                for (int j = 0; j < output_dim; j++)
                 {
-                    // cv::imshow("image",image);
-                    // cv::waitKey(1);
-                    /* mat转换为tensor */
-                    mat2Tensor(image, input);
-                    /* 保留最终输出 */
-                    std::vector<tensorflow::Tensor> outputs;
-                    /* 计算最后结果 */
-                    ros::Time pretime1=ros::Time::now();
-                    TF_CHECK_OK(session->Run({std::pair<string, Tensor>(input_name, input)}, {output_name}, {}, &outputs));
-                    std::cout<<"classify:"<<ros::Time::now()-pretime1<<std::endl;
-                    /* 获取输出 */
-
-                    Tensor t = outputs[0];                   // Fetch the first tensor
-                    auto tmap = t.tensor<float, 2>();        // Tensor Shape: [batch_size, target_class_num]
-                    int output_dim = t.shape().dim_size(1);  // Get the target_class_num from 1st dimension
-
-                    // Argmax: Get Final Prediction Label and Probability
-                    int output_class_id = -1;
-                    double output_prob = 0.0;
-                    for (int j = 0; j < output_dim; j++)
-                    {
-                        cout << "Class " << j << " prob:" << tmap(0, j) << "," << std::endl;
-                        if (tmap(0, j) >= output_prob) {
-                            output_class_id = j;
-                            output_prob = tmap(0, j);
-                        }
-                    }
-                    if (output_class_id == 0 || output_class_id == 1){
-                        _tar.id = output_class_id + 1;
-                        m_targets.emplace_back(_tar);
+                    // cout << "Class " << j << " prob:" << tmap(0, j) << "," << std::endl;
+                    if (tmap(i, j) >= output_prob) {
+                        output_class_id = j;
+                        output_prob = tmap(i, j);
                     }
                 }
-                else
-                    continue;
+                if (output_class_id == 0 || output_class_id == 1){
+                    m_preTargets[seq_temp[i]].id = output_class_id + 1;
+                    m_targets.emplace_back(m_preTargets[seq_temp[i]]);
+                }
+
             }
             m_is.addClassifiedTargets("After Classify", m_targets);
             DEBUG("m_classify end")

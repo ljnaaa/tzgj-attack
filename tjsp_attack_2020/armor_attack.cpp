@@ -64,7 +64,9 @@ class rosDetect
             if(!armor::stCamera.cameraInfo_set){
                 return;
             }
+            ros::Time start_rec = ros::Time::now();
             attackPtr->run(Image->image,msg->header.stamp,yaw,pitch,resultPub,gimbalPub,messpub,1);
+            std::cout<<"use_time:"<<ros::Time::now()-start_rec<<std::endl;
         }
 
         void get_gimbal(double& pitch,double& yaw)
