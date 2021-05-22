@@ -515,44 +515,7 @@ namespace armor
                 ;
             return i > 0 ? i : 0;
         }
-        /**
-         * @name loadAndPre
-         * @param img 图片
-         * @param result
-         * @func 进行图片的预处理和高光补偿
-         * @return true/false
-         */ 
-        bool loadAndPre(cv::Mat img, cv::Mat &result)
-        {
-            if (img.cols == 0)
-                return false;
-            /* 调整大小 同比缩放至fixedsize*fixedsize以内 */
-            if (img.cols < img.rows)
-                resize(img, img, {int(img.cols * 1.0 / img.rows * fixedSize), fixedSize});
-            else
-                resize(img, img, {fixedSize, int(img.rows * 1.0 / img.cols * fixedSize)});
-            /* 剪去边上多余部分 */
-            int cutRatio1 = 0.15 * img.cols;
-            int cutRatio2 = 0.05 * img.rows;
-            cv::Mat blank = cv::Mat(cv::Size(fixedSize, fixedSize), img.type(), cv::Scalar(0));                           //新建空白
-            cv::Mat mask = img(cv::Rect(cutRatio1, cutRatio2, img.cols - 2 * cutRatio1, img.rows - 2 * cutRatio2));       //建立腌摸
-            cv::Mat imageROI = blank(cv::Rect(cutRatio1, cutRatio2, img.cols - 2 * cutRatio1, img.rows - 2 * cutRatio2)); //建立需要覆盖区域的ROI
-            mask.copyTo(imageROI, mask);
-            int thre = getThreshold(blank);   //均值获取阈值
-            result = blank.clone();
-            /* 使用二值化阈值补高光 */
-            for (int i = 0; i < result.rows; i++)
-            {
-                for (int j = 0; j < result.cols; j++)
-                {
-                    if ((int)result.at<u_char>(i, j) > thre)
-                        result.at<u_char>(i, j) = 200;    
-                }
-            }
-            return true;
-        }
-
-
+        
         /**
          * @name init_my_tf
          * @param session 交互接口
