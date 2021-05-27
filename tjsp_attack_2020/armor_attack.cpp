@@ -67,7 +67,7 @@ class rosDetect
                 return;
             }
             attackPtr->run(Image->image,msg->header.stamp,yaw,pitch,resultPub,gimbalPub,messpub,img_client,1);
-            std::cout<<"use_time:"<<ros::Time::now()-start<<std::endl;
+                // std::cout<<"use_time:"<<ros::Time::now()-start<<std::endl;
         }
 
         void get_gimbal(double& pitch,double& yaw)

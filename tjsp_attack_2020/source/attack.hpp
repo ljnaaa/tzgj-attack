@@ -601,6 +601,8 @@ namespace armor
                 /* case B: 之前选过打击目标了, 得找到一样的目标 */
                 // PRINT_INFO("++++++++++++++++ 开始寻找上一次目标 ++++++++++++++++++++\n");
                 double distance = 0xffffffff;
+                double minDisB = 0xffffffff;
+
                 int closestElementIndex = -1;
                 for (size_t i = 0; i < m_targets.size(); ++i)
                 {
@@ -639,12 +641,14 @@ namespace armor
                     /* 参数更正，保证当前图片存在 */
                     if (distance > _distanceTemp)
                     {
+                        minDisB = distanceB*2000;
                         distance = _distanceTemp;
                         closestElementIndex = i;
                     }
                 }
                 if (closestElementIndex != -1)
                 {
+                    PRINT_WARN("distanceB = %f\n", minDisB);
                     /* 找到了 */
                     s_historyTargets.emplace_front(m_targets[closestElementIndex]);
                     PRINT_INFO("++++++++++++++++ 找到上一次目标 ++++++++++++++++++++\n");
@@ -819,7 +823,7 @@ namespace armor
                         get_gimbal(gPitch,gYaw);
                         // m_communicator.getGlobalAngle(&gYaw, &gPitch);
                         s_historyTargets[0].convert2WorldPts(-gYaw, gPitch);
-                        cout << "s_historyTargets[0].ptsInWorld : " << s_historyTargets[0].ptsInWorld << endl;
+                        // cout << "s_historyTargets[0].ptsInWorld : " << s_historyTargets[0].ptsInWorld << endl;
                         /* 卡尔曼滤波初始化/参数修正 */
                         if (s_historyTargets.size() == 1)
                         {
@@ -850,12 +854,11 @@ namespace armor
                         m_is.addText(cv::format("vx %4.0f", s_historyTargets[0].vInGimbal3d.x*100));
                         m_is.addText(cv::format("vy %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.y*100)));
                         m_is.addText(cv::format("vz %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.z*100)));
-                        if (cv::abs(s_historyTargets[0].vInGimbal3d.x) > 3)   //0.3m/s
+                        if (cv::abs(s_historyTargets[0].vInGimbal3d.x) > 6)   //0.3m/s
                         {
-                            double deltaX = vx*0.1;    //dm/s->mm/s->m(delay=0.1)
+                            double deltaX = vx*0.2;    //dm/s->mm/s->m(delay=0.1)
                             // double deltaX = cv::abs(13 * cv::abs(s_historyTargets[0].vInGimbal3d.x) *
                             //                         s_historyTargets[0].ptsInGimbal.z / 3000);
-                            std::cout<<deltaX<<std::endl;
                             deltaX = deltaX > 200 ? 200 : deltaX;
                             s_historyTargets[0].ptsInGimbal.x += deltaX;
 
