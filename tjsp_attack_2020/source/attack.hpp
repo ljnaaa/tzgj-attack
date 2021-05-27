@@ -237,7 +237,6 @@ namespace armor
             {
                 last_frame.header.stamp = image_timeStamp;
                 nav_msgs::Odometry post_msg, pre_msg;
-
                 if(odom_history.size()<2)
                 {
                     last_frame = odom_history[0];
@@ -248,7 +247,6 @@ namespace armor
                     post_msg = odom_history[0];
                     pre_msg = odom_history[1];
                 }
-
                 else
                 {
                     for(auto it=odom_history.begin(); it!=odom_history.end(); it++)
