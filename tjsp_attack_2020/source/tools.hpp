@@ -8,7 +8,7 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include <vector>
-const int fixedSize=128;
+const int fixedSize=32;
 #ifndef MYCNN_TOOLS_HPP
 #define MYCNN_TOOLS_HPP
 #endif //MYCNN_TOOLS_HPP

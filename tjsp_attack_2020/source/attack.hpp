@@ -48,8 +48,8 @@ using namespace tensorflow;
 //模型路径
 const string model_path = "/home/icra01/icra/src/tzgj-attack/tjsp_attack_2020/Model/happyModel.pb";
 /*输入输出节点*/
-const string input_name = "conv2d_9_input:0";
-const string output_name = "dense_7/Softmax:0"; 
+const string input_name = "input_4:0";
+const string output_name = "y_3/Softmax:0"; 
 #define debugit std::cout<<__LINE__<<std::endl;
 
 
