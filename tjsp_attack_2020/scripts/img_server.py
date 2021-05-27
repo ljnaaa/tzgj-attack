@@ -43,7 +43,10 @@ def imgCallback(req):
     imag_num += 1
     #预测并反馈数据'
     with graph.as_default():
-        return np.argmax(load_model.predict(img), 1)[0]
+        print('-'*50)
+        tmp = load_model.predict(img)
+        print(tmp)
+        return np.argmax(tmp, 1)[0]
     
 def img_server():
 	# ROS节点初始化
