@@ -846,19 +846,22 @@ namespace armor
                         odom_buff->transback(kalman.velocity);
                         /* 转换为云台坐标点 */
                         s_historyTargets[0].convert2GimbalPts(kalman.velocity);
-                        
-                        m_is.addText(cv::format("vx %4.0f", s_historyTargets[0].vInGimbal3d.x));
-                        m_is.addText(cv::format("vy %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.y)));
-                        m_is.addText(cv::format("vz %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.z)));
-                        if (cv::abs(s_historyTargets[0].vInGimbal3d.x) > 1.6)
+                        double vx = s_historyTargets[0].vInGimbal3d.x*100;   //mm/s
+                        m_is.addText(cv::format("vx %4.0f", s_historyTargets[0].vInGimbal3d.x*100));
+                        m_is.addText(cv::format("vy %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.y*100)));
+                        m_is.addText(cv::format("vz %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.z*100)));
+                        if (cv::abs(s_historyTargets[0].vInGimbal3d.x) > 3)   //0.3m/s
                         {
-                            double deltaX = cv::abs(13 * cv::abs(s_historyTargets[0].vInGimbal3d.x) *
-                                                    s_historyTargets[0].ptsInGimbal.z / 3000);
-                            
-                            deltaX = deltaX > 300 ? 300 : deltaX;
-                            s_historyTargets[0].ptsInGimbal.x +=
-                                1*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
-                                s_historyTargets[0].vInGimbal3d.x;
+                            double deltaX = vx*0.1;    //dm/s->mm/s->m(delay=0.1)
+                            // double deltaX = cv::abs(13 * cv::abs(s_historyTargets[0].vInGimbal3d.x) *
+                            //                         s_historyTargets[0].ptsInGimbal.z / 3000);
+                            std::cout<<deltaX<<std::endl;
+                            deltaX = deltaX > 200 ? 200 : deltaX;
+                            s_historyTargets[0].ptsInGimbal.x += deltaX;
+
+                            // s_historyTargets[0].ptsInGimbal.x +=
+                            //     1*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
+                            //     s_historyTargets[0].vInGimbal3d.x;
                         }
                     }
                 }
@@ -912,12 +915,11 @@ namespace armor
                     mycar.pose.pose.orientation.z=0;
                     mycar.pose.pose.orientation.w=1;
                     mycar.pose.header.seq=cur_frame++;
-                    mycar.pose.header.stamp=ros::Time::now();
+                    mycar.pose.header.stamp=image_timeStamp;
                     mycar.pose.header.frame_id = "/base_link";
                     mycar.pose.pose.position.x=s_historyTargets[0].ptsInWorld.x;
                     mycar.pose.pose.position.y=s_historyTargets[0].ptsInWorld.y;
                     mycar.pose.pose.position.z=s_historyTargets[0].ptsInWorld.z;
-                    mycar.pose.header.stamp.sec = timeStamp;
                     mycar.id = s_historyTargets[0].id;
                     mycar.color = mode;    //红蓝模式,yaml文件中读出
                     temp.emplace_back(mycar);
