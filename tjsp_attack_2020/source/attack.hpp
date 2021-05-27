@@ -168,8 +168,8 @@ namespace armor
                 float k = (post_pitch-pre_pitch)/float(post_time-pre_time);
                 float pred_pitch = pre_pitch + k*(timeStamp-pre_time);
                 
-                while(pred_pitch > M_PI) pred_pitch -= M_PI;
-                while(pred_pitch < -M_PI) pred_pitch += M_PI;
+                while(pred_pitch > 2*M_PI) pred_pitch -= 2*M_PI;
+                while(pred_pitch < -2*M_PI) pred_pitch += 2*M_PI;
                 
                 return pred_pitch;
 
@@ -186,8 +186,9 @@ namespace armor
                 odom_sub = n.subscribe("odom",1,&OdomBuff::odom_cb,this);
             }
 
-            void pose_judge(cv::Point3d& inchassis)
+            void pose_judge(cv::Point3d& inchassis, const ros::Time& image_timeStamp)
             {
+                update_last_frame(image_timeStamp);
                 double delta_yaw = transform(last_frame,standard);
                             /* yaw 为绕y轴旋转的 */
                 m_rotY = (cv::Mat_<double>(3, 3)
@@ -217,6 +218,8 @@ namespace armor
 
         private:
             nav_msgs::Odometry last_frame;
+            const int LEN = 5;
+            std::deque<nav_msgs::Odometry> odom_history;
             nav_msgs::Odometry standard;    //standard pose of one kalman filter
             ros::Subscriber odom_sub;
             cv::Mat m_rotY;
@@ -225,8 +228,106 @@ namespace armor
             
             void odom_cb(const nav_msgs::Odometry::ConstPtr& msg)
             {
+                while(odom_history.size() >= LEN) odom_history.pop_back();
+                odom_history.push_front(*msg);
                 last_frame = *msg;
             }
+
+            void update_last_frame(const ros::Time& image_timeStamp)
+            {
+                last_frame.header.stamp = image_timeStamp;
+                nav_msgs::Odometry post_msg, pre_msg;
+                if(odom_history.size()<2)
+                {
+                    last_frame = odom_history[0];
+                    return;
+                }
+                if(odom_history[0].header.stamp <= image_timeStamp)
+                {
+                    post_msg = odom_history[0];
+                    pre_msg = odom_history[1];
+                }
+                else
+                {
+                    for(auto it=odom_history.begin(); it!=odom_history.end(); it++)
+                    {
+                        if(it->header.stamp >= image_timeStamp)
+                        {
+                            post_msg = *it;
+                        }
+                        else
+                        {
+                            pre_msg = *it;
+                            break;
+                        }
+                    }
+                }
+                update_pose(last_frame, post_msg, pre_msg, image_timeStamp);
+                update_twist(last_frame, post_msg, pre_msg, image_timeStamp);
+                
+                std::cout<<"POST POSE: "<<post_msg.pose.pose<<" , TIME: "<<post_msg.header.stamp<<"\n";
+                std::cout<<"PRE POSE: "<<pre_msg.pose.pose<<" , TIME: "<<pre_msg.header.stamp<<"\n";
+                std::cout<<"PRED POSE: "<<last_frame.pose.pose<<" , TIME: "<<last_frame.header.stamp<<"\n";
+                std::cout<<"POST TWIST: "<<post_msg.twist.twist<<" , TIME: "<<post_msg.header.stamp<<"\n";
+                std::cout<<"PRE TWIST: "<<pre_msg.twist.twist<<" , TIME: "<<pre_msg.header.stamp<<"\n";
+                std::cout<<"PRED TWIST: "<<last_frame.twist.twist<<" , TIME: "<<last_frame.header.stamp<<"\n";                
+            }
+
+            void update_pose(nav_msgs::Odometry&p,  nav_msgs::Odometry p1, nav_msgs::Odometry p2, const ros::Time& image_timeStamp)
+            {
+                geometry_msgs::Pose pred_pose;
+                float k_x = (p1.pose.pose.position.x-p2.pose.pose.position.x) / (p1.header.stamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6));
+                float k_y = (p1.pose.pose.position.y-p2.pose.pose.position.y) / (p1.header.stamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6));
+                float k_z = (p1.pose.pose.position.z-p2.pose.pose.position.z) / (p1.header.stamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6));
+                float k_x1 = (p1.pose.pose.orientation.x-p2.pose.pose.orientation.x) / (p1.header.stamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6));
+                float k_y1 = (p1.pose.pose.orientation.y-p2.pose.pose.orientation.y) / (p1.header.stamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6));
+                float k_z1 = (p1.pose.pose.orientation.z-p2.pose.pose.orientation.z) / (p1.header.stamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6));
+                float k_w = (p1.pose.pose.orientation.w-p2.pose.pose.orientation.w) / (p1.header.stamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6));
+                
+                pred_pose.position.x = p2.pose.pose.position.x + (image_timeStamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6))*k_x;
+                pred_pose.position.y = p2.pose.pose.position.y + (image_timeStamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6))*k_y;
+                pred_pose.position.z = p2.pose.pose.position.z + (image_timeStamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6))*k_z;
+                pred_pose.orientation.x = p2.pose.pose.orientation.x + (image_timeStamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6))*k_x1;
+                pred_pose.orientation.y = p2.pose.pose.orientation.y + (image_timeStamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6))*k_y1;
+                pred_pose.orientation.z = p2.pose.pose.orientation.z + (image_timeStamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6))*k_z1;
+                pred_pose.orientation.w = p2.pose.pose.orientation.w + (image_timeStamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6))*k_w;
+
+                p.pose.pose = pred_pose;
+
+                for(int i=0; i<36; i++)
+                {
+                    p.pose.covariance[i] = (p1.pose.covariance[i] + p2.pose.covariance[i]) / 4;
+                }
+                
+            }
+
+            void update_twist(nav_msgs::Odometry&t,  nav_msgs::Odometry t1, nav_msgs::Odometry t2, const ros::Time& image_timeStamp)
+            {
+                geometry_msgs::Twist pred_twist;
+                float kl_x = (t1.twist.twist.linear.x - t2.twist.twist.linear.x) / (t1.header.stamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6));
+                float kl_y = (t1.twist.twist.linear.y - t2.twist.twist.linear.y) / (t1.header.stamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6));
+                float kl_z = (t1.twist.twist.linear.z - t2.twist.twist.linear.z) / (t1.header.stamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6));
+                float ka_x = (t1.twist.twist.angular.x - t2.twist.twist.angular.x) / (t1.header.stamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6));
+                float ka_y = (t1.twist.twist.angular.y - t2.twist.twist.angular.y) / (t1.header.stamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6));
+                float ka_z = (t1.twist.twist.angular.z - t2.twist.twist.angular.z) / (t1.header.stamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6));
+
+                pred_twist.linear.x = t2.twist.twist.linear.x + (image_timeStamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6))*kl_x;
+                pred_twist.linear.y = t2.twist.twist.linear.y + (image_timeStamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6))*kl_y;
+                pred_twist.linear.z = t2.twist.twist.linear.z + (image_timeStamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6))*kl_z;
+                pred_twist.angular.x = t2.twist.twist.angular.x + (image_timeStamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6))*ka_x;
+                pred_twist.angular.y = t2.twist.twist.angular.y + (image_timeStamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6))*ka_y;
+                pred_twist.angular.z = t2.twist.twist.angular.z + (image_timeStamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6))*ka_z;
+
+                t.twist.twist = pred_twist;
+                for(int i=0; i<36; i++)
+                {
+                    t.twist.covariance[i] = (t1.twist.covariance[i] + t2.twist.covariance[i]) / 4;
+                }
+            }
+
+
+
+
 
             double transform(nav_msgs::Odometry& last,nav_msgs::Odometry&standard)
             {
@@ -244,6 +345,7 @@ namespace armor
                 tf::Matrix3x3(quat).getRPY(roll,pitch,yaw);
                 return yaw;
             }
+
 
             
 
@@ -828,12 +930,12 @@ namespace armor
                         if (s_historyTargets.size() == 1)
                         {
                             odom_buff->reset_standard();
-                            odom_buff->pose_judge(s_historyTargets[0].ptsInWorld);
+                            odom_buff->pose_judge(s_historyTargets[0].ptsInWorld, image_timeStamp);
                             kalman.clear_and_init(s_historyTargets[0].ptsInWorld, timeStamp);
                         }
                         else
                         {
-                            odom_buff->pose_judge(s_historyTargets[0].ptsInWorld);
+                            odom_buff->pose_judge(s_historyTargets[0].ptsInWorld, image_timeStamp);
                             kalman.correct(s_historyTargets[0].ptsInWorld, timeStamp);
                         }
                     }
