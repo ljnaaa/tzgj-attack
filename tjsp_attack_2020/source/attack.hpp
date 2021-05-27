@@ -411,7 +411,10 @@ namespace armor
                     _light.topPt = topPt;
                     _light.bottomPt = bottomPt;
                 }
+                std::cout << "Top:" << _light.topPt.x << ", " <<_light.topPt.y << std::endl;
+                std::cout << "Bottom" << _light.bottomPt.x << ", " << _light.bottomPt.y << std::endl;
                 _light.centerPt = rRect.center;             //中心点
+                std::cout << rRect.center.x << ", " << rRect.center.y << std::endl;
                 _light.length = cv::norm(bottomPt - topPt); //长度
                  /* 判断长度和倾斜角是否合乎要求 */
                 if (_light.length < 3.0 || 800.0 < _light.length || cv::abs(_light.angle - 90) > 30.0)
@@ -550,13 +553,13 @@ namespace armor
             int i = 0;
             for(cv::Mat& img : img_temp)
             {
-                float *source_data = (float *)img.data;
+                uint8_t *source_data = (uint8_t *)img.data;
                 for (int y = 0; y < fixedSize; ++y)
                 {
-                    float *source_row = source_data + y * fixedSize;
+                    uint8_t *source_row = source_data + y * fixedSize;
                     for (int x = 0; x < fixedSize; ++x)
                     {
-                        float *source_pixel = source_row + x;
+                        uint8_t *source_pixel = source_row + x;
 
                         input_tensor_mapped(i, y, x, 0) = float(*source_pixel);
                     }
@@ -632,10 +635,12 @@ namespace armor
             for(int i = 0; i < size; ++i){
                 // Argmax: Get Final Prediction Label and Probability
                 int output_class_id = -1;
-                double output_prob = 0.0;
+                double output_prob = -1;
+                std::cout << "---------------------------------------------" << endl;
+                //std::cout << i << ":" << std::endl;
                 for (int j = 0; j < output_dim; j++)
                 {
-                    // cout << "Class " << j << " prob:" << tmap(0, j) << "," << std::endl;
+                    std::cout << "Class " << j << " prob:" << tmap(0, j) << "," << std::endl;
                     if (tmap(i, j) >= output_prob) {
                         output_class_id = j;
                         output_prob = tmap(i, j);
