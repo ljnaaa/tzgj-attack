@@ -453,7 +453,7 @@ namespace armor
             else
             {
                 /* 红色 */
-                cv::inRange(m_bgr, cv::Scalar(150, 200, 150), cv::Scalar(255, 255, 255), bgrChecked);
+                cv::inRange(m_bgr, cv::Scalar(140, 0, 0), cv::Scalar(255, 255, 180), bgrChecked);
             }
             m_is.clock("inRange");
             DEBUG("inRange end")
@@ -725,17 +725,14 @@ namespace armor
                 {
                     cv::imwrite(cv::format("/home/icra01/images/%d.png", m_cropNameCounter++), _crop);
                 }
-
-                cv::Mat image;
                 // ros::Time now=ros::Time::now();
                 // std::cout<<"first"<<" "<<now-pretime<<"  ";
                 // std::cout<<std::endl;
-                if (loadAndPre(_crop, image)){
-                    img_temp.emplace_back(image);
-                    //因为最后要押的是Target，而不是cv::Mar，故需要记录一一对应的序号
-                    seq_temp.emplace_back(i);
-                    i++;
-                }
+                
+                img_temp.emplace_back(_crop);
+                //因为最后要押的是Target，而不是cv::Mar，故需要记录一一对应的序号
+                seq_temp.emplace_back(i);
+                i++;
             }
             int size = img_temp.size();
             //cout << (size == seq_temp.size());
