@@ -49,8 +49,8 @@ using namespace tensorflow;
 //模型路径
 const string model_path = "/home/icra01/icra/src/tzgj-attack/tjsp_attack_2020/Model/happyModel.pb";
 /*输入输出节点*/
-const string input_name = "input_4:0";
-const string output_name = "y_3/Softmax:0"; 
+const string input_name = "input_1:0";
+const string output_name = "y/Softmax:0"; 
 
 
 namespace armor
@@ -769,8 +769,12 @@ namespace armor
                         output_prob = tmap(i, j);
                     }
                 }
-                if (output_class_id == 0 || output_class_id == 1){
+                if (output_class_id == 0){
                     m_preTargets[seq_temp[i]].id = output_class_id + 1;
+                    m_targets.emplace_back(m_preTargets[seq_temp[i]]);
+                }
+                else if(output_class_id == 2){
+                    m_preTargets[seq_temp[i]].id = output_class_id;
                     m_targets.emplace_back(m_preTargets[seq_temp[i]]);
                 }
 
@@ -1032,7 +1036,7 @@ namespace armor
             {
                 m_preDetect(pmode);
                 m_is.clock("m_classify");
-                m_classify_single_tensor(0); 
+                m_classify_single_tensor(1); 
                 m_is.clock("m_classify");
             }
 
