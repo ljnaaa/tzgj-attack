@@ -16,7 +16,7 @@ class rosDetect
     public:
         rosDetect()
         {
-            // /* 开图像显示辅助程序 */
+            // /* 开图像显示辅助程序 */c
 
             armor::PID pid;
             pid.init(armor::stConfig.get<double>("auto.kp"),
@@ -41,9 +41,9 @@ class rosDetect
             ros::NodeHandle messnode;
             image_transport::ImageTransport it(n);
             startTime = ros::Time::now();
-            ros::Subscriber image_sub = n.subscribe("/cam0/image_raw",1,&rosDetect::imageCB,this);  //收到摄像头的消息，就回调该函数
+            ros::Subscriber image_sub = n.subscribe("/cam1/image_raw",1,&rosDetect::imageCB,this);  //收到摄像头的消息，就回调该函数
                                                                                                     //感觉迷你PC算力真是强大
-            ros::Subscriber cameraInfo_sub = n.subscribe("/cam0/camera_info",1,&rosDetect::cameraInfoCB,this);
+            ros::Subscriber cameraInfo_sub = n.subscribe("/cam1/camera_info",1,&rosDetect::cameraInfoCB,this);
             resultPub = it.advertise("detection",1);
             gimbalPub = n.advertise<roborts_msgs::GimbalAngle>("/cmd_gimbal_angle",1);
             //messpub = messnode.advertise<roborts_msgs::test>("roborts_all",1);
