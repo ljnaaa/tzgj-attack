@@ -21,6 +21,7 @@
 #include <roborts_msgs/ShootCmd.h>
 #include <nav_msgs/Odometry.h>
 #include <tf/tf.h>
+#include <math.h>
 #define debugit std::cout<<__LINE__<<std::endl;
 //#include <roborts_msgs/Mess.h>
 
@@ -117,8 +118,8 @@ namespace armor
                 double k = (post_yaw-pre_yaw)/double(post_time-pre_time);
                 double pred_yaw = pre_yaw + k*(timeStamp-pre_time);
                 
-                while(pred_yaw > 2*M_PI) pred_yaw -= 2*M_PI;
-                while(pred_yaw < -2*M_PI) pred_yaw += 2*M_PI;
+                while(pred_yaw > M_PI) pred_yaw -= 2*M_PI;
+                while(pred_yaw < -M_PI) pred_yaw += 2*M_PI;
                 
                 int64_t last = imu_history[0].stamp.toSec()*pow(10,6);
                 // std::cout<<"PRE YAW: "<<pre_yaw<<" , TIME: "<<pre_time<<"\n";
@@ -265,12 +266,12 @@ namespace armor
                 update_pose(last_frame, post_msg, pre_msg, image_timeStamp);
                 update_twist(last_frame, post_msg, pre_msg, image_timeStamp);
                 
-                std::cout<<"POST POSE: "<<post_msg.pose.pose<<" , TIME: "<<post_msg.header.stamp<<"\n";
-                std::cout<<"PRE POSE: "<<pre_msg.pose.pose<<" , TIME: "<<pre_msg.header.stamp<<"\n";
-                std::cout<<"PRED POSE: "<<last_frame.pose.pose<<" , TIME: "<<last_frame.header.stamp<<"\n";
-                std::cout<<"POST TWIST: "<<post_msg.twist.twist<<" , TIME: "<<post_msg.header.stamp<<"\n";
-                std::cout<<"PRE TWIST: "<<pre_msg.twist.twist<<" , TIME: "<<pre_msg.header.stamp<<"\n";
-                std::cout<<"PRED TWIST: "<<last_frame.twist.twist<<" , TIME: "<<last_frame.header.stamp<<"\n";                
+                // std::cout<<"POST POSE: "<<post_msg.pose.pose<<" , TIME: "<<post_msg.header.stamp<<"\n";
+                // std::cout<<"PRE POSE: "<<pre_msg.pose.pose<<" , TIME: "<<pre_msg.header.stamp<<"\n";
+                // std::cout<<"PRED POSE: "<<last_frame.pose.pose<<" , TIME: "<<last_frame.header.stamp<<"\n";
+                // std::cout<<"POST TWIST: "<<post_msg.twist.twist<<" , TIME: "<<post_msg.header.stamp<<"\n";
+                // std::cout<<"PRE TWIST: "<<pre_msg.twist.twist<<" , TIME: "<<pre_msg.header.stamp<<"\n";
+                // std::cout<<"PRED TWIST: "<<last_frame.twist.twist<<" , TIME: "<<last_frame.header.stamp<<"\n";                
             }
 
             void update_pose(nav_msgs::Odometry&p,  nav_msgs::Odometry p1, nav_msgs::Odometry p2, const ros::Time& image_timeStamp)
@@ -672,7 +673,7 @@ namespace armor
             {
                 iter->rTick++;
                 /* 历史值数量大于30便删除末尾记录 (似乎是大于5就删除？？？）*/
-                if (iter->rTick > 5)
+                if (iter->rTick > 10)
                 {
                     s_historyTargets.erase(iter, s_historyTargets.end());
                     break;
@@ -703,6 +704,7 @@ namespace armor
                 /* case B: 之前选过打击目标了, 得找到一样的目标 */
                 // PRINT_INFO("++++++++++++++++ 开始寻找上一次目标 ++++++++++++++++++++\n");
                 double distance = 0xffffffff;
+
                 int closestElementIndex = -1;
                 for (size_t i = 0; i < m_targets.size(); ++i)
                 {
@@ -840,6 +842,33 @@ namespace armor
             }
         }
 
+    void Matrix2Euler(Target& tar)
+    {
+        double roll = atan2(tar.rvMat.at<double>(2,1),tar.rvMat.at<double>(2,2));
+        double pitch = atan2(-tar.rvMat.at<double>(2,0),sqrt(pow(tar.rvMat.at<double>(2,2),2)+pow(tar.rvMat.at<double>(2,1),2)));
+        double yaw = atan2(tar.rvMat.at<double>(1,0),tar.rvMat.at<double>(0,0));
+        tar.relativeYaw = pitch;
+        // std::cout<<"roll:"<<roll<<"   "<<"pitch:"<<pitch<<"yaw:"<<yaw<<std::endl;
+    }
+
+    bool ChangeCondition(std::deque<Target>& targets)
+    {
+        if(targets.size()<2)
+        {
+            return true;
+        }
+        else
+        {
+            if(cv::abs(targets[0].relativeYaw - targets[1].relativeYaw)>M_PI/4)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+    }
 
 
         /**
@@ -910,7 +939,7 @@ namespace armor
             if (!s_historyTargets.empty())
             {
                 m_is.addFinalTargets("selected", s_historyTargets[0]);
-
+                Matrix2Euler(s_historyTargets[0]);
                 /* 5.预测部分 */
                 // ros::Time pretime2=ros::Time::now();
                 if (m_isEnablePredict)
@@ -921,10 +950,11 @@ namespace armor
                         get_gimbal(gPitch,gYaw);
                         // m_communicator.getGlobalAngle(&gYaw, &gPitch);
                         s_historyTargets[0].convert2WorldPts(-gYaw, gPitch);
-                        cout << "s_historyTargets[0].ptsInWorld : " << s_historyTargets[0].ptsInWorld << endl;
+                        // cout << "s_historyTargets[0].ptsInWorld : " << s_historyTargets[0].ptsInWorld << endl;
                         /* 卡尔曼滤波初始化/参数修正 */
-                        if (s_historyTargets.size() == 1)
+                        if (s_historyTargets.size() == 1||ChangeCondition(s_historyTargets))
                         {
+                            std::cout<<"RESET"<<std::endl;
                             odom_buff->reset_standard();
                             odom_buff->pose_judge(s_historyTargets[0].ptsInWorld, image_timeStamp);
                             kalman.clear_and_init(s_historyTargets[0].ptsInWorld, timeStamp);
@@ -948,19 +978,21 @@ namespace armor
                         odom_buff->transback(kalman.velocity);
                         /* 转换为云台坐标点 */
                         s_historyTargets[0].convert2GimbalPts(kalman.velocity);
-                        
-                        m_is.addText(cv::format("vx %4.0f", s_historyTargets[0].vInGimbal3d.x));
-                        m_is.addText(cv::format("vy %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.y)));
-                        m_is.addText(cv::format("vz %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.z)));
-                        if (cv::abs(s_historyTargets[0].vInGimbal3d.x) > 1.6)
+                        double vx = s_historyTargets[0].vInGimbal3d.x*100;   //mm/s
+                        m_is.addText(cv::format("vx %4.0f", s_historyTargets[0].vInGimbal3d.x*100));
+                        m_is.addText(cv::format("vy %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.y*100)));
+                        m_is.addText(cv::format("vz %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.z*100)));
+                        if (cv::abs(s_historyTargets[0].vInGimbal3d.x) > 6)   //0.3m/s
                         {
-                            double deltaX = cv::abs(13 * cv::abs(s_historyTargets[0].vInGimbal3d.x) *
-                                                    s_historyTargets[0].ptsInGimbal.z / 3000);
-                            
-                            deltaX = deltaX > 300 ? 300 : deltaX;
-                            s_historyTargets[0].ptsInGimbal.x +=
-                                1*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
-                                s_historyTargets[0].vInGimbal3d.x;
+                            double deltaX = vx*0.2;    //dm/s->mm/s->m(delay=0.1)
+                            // double deltaX = cv::abs(13 * cv::abs(s_historyTargets[0].vInGimbal3d.x) *
+                            //                         s_historyTargets[0].ptsInGimbal.z / 3000);
+                            deltaX = deltaX > 200 ? 200 : deltaX;
+                            s_historyTargets[0].ptsInGimbal.x += deltaX;
+
+                            // s_historyTargets[0].ptsInGimbal.x +=
+                            //     1*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
+                            //     s_historyTargets[0].vInGimbal3d.x;
                         }
                     }
                 }
@@ -1014,12 +1046,11 @@ namespace armor
                     mycar.pose.pose.orientation.z=0;
                     mycar.pose.pose.orientation.w=1;
                     mycar.pose.header.seq=cur_frame++;
-                    mycar.pose.header.stamp=ros::Time::now();
+                    mycar.pose.header.stamp=image_timeStamp;
                     mycar.pose.header.frame_id = "/base_link";
                     mycar.pose.pose.position.x=s_historyTargets[0].ptsInWorld.x;
                     mycar.pose.pose.position.y=s_historyTargets[0].ptsInWorld.y;
                     mycar.pose.pose.position.z=s_historyTargets[0].ptsInWorld.z;
-                    mycar.pose.header.stamp.sec = timeStamp;
                     mycar.id = s_historyTargets[0].id;
                     mycar.color = mode;    //红蓝模式,yaml文件中读出
                     temp.emplace_back(mycar);
@@ -1056,6 +1087,7 @@ namespace armor
                 vision_data.if_shoot = false;
                 vision_data.if_enemy = false;
                 last_vision_data = vision_data;
+                std::cout<<"LOSS"<<std::endl;
             }
             sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
             resultPub.publish(*msg);

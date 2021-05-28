@@ -283,6 +283,7 @@ namespace armor
         cv::Point3d ptsInShoot;          // 物体在经过弹道修正后的云台坐标系下坐标
         float rPitch;                    // 相对Pitch值, 发给电控
         float rYaw;                      // 相对Yaw值, 发给电控
+        double relativeYaw;   //装甲版平面相对于相机角度
         int rTick;                       // 相对帧编号
         int id = 0;                      // id为0，则为非装甲板，1为1类，2为2类
         emTargetType type;               // TARGET_SMALL, TARGET_TARGET
@@ -491,7 +492,7 @@ namespace armor
         void convertPts2Euler(cv::Point3d &pts, float *pYaw, float *pPitch)
         {
             // float _pitch = cv::fastAtan2(pts.y+0.1, cv::sqrt(pts.x * pts.x + pts.z * pts.z));
-            float _pitch = pitch_feedback(cv::sqrt(pts.x * pts.x + pts.z * pts.z),pts.y+100,20);
+            float _pitch = pitch_feedback(cv::sqrt(pts.x * pts.x + pts.z * pts.z),pts.y+150,20);
             float _yaw = cv::fastAtan2(pts.x, cv::sqrt(pts.y * pts.y + pts.z * pts.z));
             _pitch = _pitch >  M_PI ? _pitch - 2*M_PI : _pitch;
             *pPitch = -_pitch;

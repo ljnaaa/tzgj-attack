@@ -41,9 +41,9 @@ class rosDetect
             ros::NodeHandle messnode;
             image_transport::ImageTransport it(n);
             startTime = ros::Time::now();
-            ros::Subscriber image_sub = n.subscribe("/cam0/image_raw",1,&rosDetect::imageCB,this);  //收到摄像头的消息，就回调该函数
+            ros::Subscriber image_sub = n.subscribe("/cam1/image_raw",1,&rosDetect::imageCB,this);  //收到摄像头的消息，就回调该函数
                                                                                                     //感觉迷你PC算力真是强大
-            ros::Subscriber cameraInfo_sub = n.subscribe("/cam0/camera_info",1,&rosDetect::cameraInfoCB,this);
+            ros::Subscriber cameraInfo_sub = n.subscribe("/cam1/camera_info",1,&rosDetect::cameraInfoCB,this);
             resultPub = it.advertise("detection",1);
             gimbalPub = n.advertise<roborts_msgs::GimbalAngle>("/cmd_gimbal_angle",1);
             //messpub = messnode.advertise<roborts_msgs::test>("roborts_all",1);
@@ -67,7 +67,7 @@ class rosDetect
                 return;
             }
             attackPtr->run(Image->image,msg->header.stamp,yaw,pitch,resultPub,gimbalPub,messpub,img_client,1);
-        }
+}
 
         void get_gimbal(double& pitch,double& yaw)
         {
