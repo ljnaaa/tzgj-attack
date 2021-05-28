@@ -3,6 +3,7 @@
     attack-color =  'red'
     #attack-color = 'blue'
 
+#0->2 ,
 # 弹道
 [curve]
     test-shoot = false   # true = 使用以下两个固定值, false = 按拟合值计算

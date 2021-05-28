@@ -49,7 +49,7 @@ using namespace tensorflow;
 //模型路径
 const string model_path = "/home/icra01/icra/src/tzgj-attack/tjsp_attack_2020/Model/happyModel.pb";
 /*输入输出节点*/
-const string input_name = "input_1:0";
+const string input_name = "input_2:0";
 const string output_name = "y/Softmax:0"; 
 
 
@@ -728,11 +728,17 @@ namespace armor
                 // ros::Time now=ros::Time::now();
                 // std::cout<<"first"<<" "<<now-pretime<<"  ";
                 // std::cout<<std::endl;
-                
-                img_temp.emplace_back(_crop);
-                //因为最后要押的是Target，而不是cv::Mar，故需要记录一一对应的序号
-                seq_temp.emplace_back(i);
-                i++;
+                cv::Mat image;
+
+                    // ros::Time now=ros::Time::now();
+                    // std::cout<<"first"<<" "<<now-pretime<<"  ";
+                    // std::cout<<std::endl;
+                if (loadAndPre(_crop, image)){
+                    img_temp.emplace_back(image);
+                    //因为最后要押的是Target，而不是cv::Mar，故需要记录一一对应的序号
+                    seq_temp.emplace_back(i);
+                    i++;
+                }
             }
             int size = img_temp.size();
             //cout << (size == seq_temp.size());
@@ -770,11 +776,11 @@ namespace armor
                     }
                 }
                 if (output_class_id == 0){
-                    m_preTargets[seq_temp[i]].id = output_class_id + 1;
+                    m_preTargets[seq_temp[i]].id = 1;
                     m_targets.emplace_back(m_preTargets[seq_temp[i]]);
                 }
                 else if(output_class_id == 2){
-                    m_preTargets[seq_temp[i]].id = output_class_id;
+                    m_preTargets[seq_temp[i]].id = 2;
                     m_targets.emplace_back(m_preTargets[seq_temp[i]]);
                 }
 
