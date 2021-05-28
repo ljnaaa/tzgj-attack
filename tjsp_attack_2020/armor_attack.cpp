@@ -16,7 +16,7 @@ class rosDetect
     public:
         rosDetect()
         {
-            // /* 开图像显示辅助程序 */
+            // /* 开图像显示辅助程序 */c
 
             armor::PID pid;
             pid.init(armor::stConfig.get<double>("auto.kp"),
@@ -48,8 +48,6 @@ class rosDetect
             gimbalPub = n.advertise<roborts_msgs::GimbalAngle>("/cmd_gimbal_angle",1);
             //messpub = messnode.advertise<roborts_msgs::test>("roborts_all",1);
             messpub = messnode.advertise<roborts_msgs::visual_detection>("roborts_all",1);//定义
-            ros::service::waitForService("/classify");
-            img_client = n.serviceClient<tjsp_attack_2020::img>("/classify");
             listener = new tf::TransformListener;
             ros::spin();
         }
@@ -66,8 +64,10 @@ class rosDetect
             if(!armor::stCamera.cameraInfo_set){
                 return;
             }
-            attackPtr->run(Image->image,msg->header.stamp,yaw,pitch,resultPub,gimbalPub,messpub,img_client,1);
-}
+            ros::Time start_rec = ros::Time::now();
+            attackPtr->run(Image->image,msg->header.stamp,yaw,pitch,resultPub,gimbalPub,messpub,1);
+            std::cout<<"use_time:"<<ros::Time::now()-start_rec<<std::endl;
+        }
 
         void get_gimbal(double& pitch,double& yaw)
         {
@@ -117,7 +117,6 @@ class rosDetect
         ros::Publisher gimbalPub;
         ros::Publisher messpub;//声明
         tf::TransformListener* listener;
-        ros::ServiceClient img_client;
 };
 
 
