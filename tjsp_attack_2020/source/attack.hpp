@@ -49,7 +49,7 @@ using namespace tensorflow;
 //模型路径
 const string model_path = "/home/icra01/icra/src/tzgj-attack/tjsp_attack_2020/Model/happyModel.pb";
 /*输入输出节点*/
-const string input_name = "input_2:0";
+const string input_name = "input_1:0";
 const string output_name = "y/Softmax:0"; 
 
 
@@ -673,10 +673,11 @@ namespace armor
 
             auto input_tensor_mapped = input.tensor<float, 4>();
 
-            int i = 0;
-            for(cv::Mat& img : img_temp)
-            {
-                uint8_t *source_data = (uint8_t *)img.data;
+            for(int i = 0; i < img_temp.size(); ++i)
+            {   
+                std::cout << "+++++++++++++++++++++++++++++++++++++" << std::endl;
+                std::cout << img_temp[i].type() << std::endl;
+                uint8_t *source_data = (uint8_t *)img_temp[i].data;
                 for (int y = 0; y < fixedSize; ++y)
                 {
                     uint8_t *source_row = source_data + y * fixedSize;
@@ -684,7 +685,7 @@ namespace armor
                     {
                         uint8_t *source_pixel = source_row + x;
 
-                        input_tensor_mapped(i, y, x, 0) = float(*source_pixel);
+                        input_tensor_mapped(i, y, x, 0) = uint8_t(*source_pixel);
                     }
                 }
                 i++;
@@ -733,12 +734,14 @@ namespace armor
                     // ros::Time now=ros::Time::now();
                     // std::cout<<"first"<<" "<<now-pretime<<"  ";
                     // std::cout<<std::endl;
-                if (loadAndPre(_crop, image)){
-                    img_temp.emplace_back(image);
+                if(_crop.cols){
+                    resize(_crop,_crop,{fixedSize, fixedSize});
+                    img_temp.emplace_back(_crop);
                     //因为最后要押的是Target，而不是cv::Mar，故需要记录一一对应的序号
                     seq_temp.emplace_back(i);
                     i++;
                 }
+
             }
             int size = img_temp.size();
             //cout << (size == seq_temp.size());
