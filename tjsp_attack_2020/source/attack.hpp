@@ -49,8 +49,8 @@ using namespace tensorflow;
 //模型路径
 const string model_path = "/home/icra01/icra/src/tzgj-attack/tjsp_attack_2020/Model/happyModel.pb";
 /*输入输出节点*/
-const string input_name = "input_1:0";
-const string output_name = "y/Softmax:0"; 
+const string input_name = "input_2:0";
+const string output_name = "y_1/Softmax:0"; 
 
 
 namespace armor
@@ -675,8 +675,8 @@ namespace armor
 
             for(int i = 0; i < img_temp.size(); ++i)
             {   
-                std::cout << "+++++++++++++++++++++++++++++++++++++" << std::endl;
-                std::cout << img_temp[i].type() << std::endl;
+                //std::cout << "+++++++++++++++++++++++++++++++++++++" << std::endl;
+                //std::cout << img_temp[i].type() << std::endl;
                 uint8_t *source_data = (uint8_t *)img_temp[i].data;
                 for (int y = 0; y < fixedSize; ++y)
                 {
@@ -768,22 +768,18 @@ namespace armor
                 // Argmax: Get Final Prediction Label and Probability
                 int output_class_id = -1;
                 double output_prob = -1;
-                std::cout << "---------------------------------------------" << endl;
+                //std::cout << "---------------------------------------------" << endl;
                 //std::cout << i << ":" << std::endl;
                 for (int j = 0; j < output_dim; j++)
                 {
-                    std::cout << "Class " << j << " prob:" << tmap(0, j) << "," << std::endl;
+                    //std::cout << "Class " << j << " prob:" << tmap(0, j) << "," << std::endl;
                     if (tmap(i, j) >= output_prob) {
                         output_class_id = j;
                         output_prob = tmap(i, j);
                     }
                 }
-                if (output_class_id == 0){
-                    m_preTargets[seq_temp[i]].id = 1;
-                    m_targets.emplace_back(m_preTargets[seq_temp[i]]);
-                }
-                else if(output_class_id == 2){
-                    m_preTargets[seq_temp[i]].id = 2;
+                if (output_class_id){
+                    m_preTargets[seq_temp[i]].id = output_class_id;
                     m_targets.emplace_back(m_preTargets[seq_temp[i]]);
                 }
 
