@@ -52,6 +52,7 @@ const string model_path = "/home/icra01/icra/src/tzgj-attack/tjsp_attack_2020/Mo
 const string input_name = "input_2:0";
 const string output_name = "y_1/Softmax:0"; 
 
+const int secmult = 1000000;
 
 namespace armor
 {
@@ -109,26 +110,26 @@ namespace armor
                 {
                     return imu_history[0].imu.yaw_angle;
                 }
-                if((imu_history[0].stamp).toSec()*pow(10,6) <= timeStamp)
+                if((imu_history[0].stamp).toSec()*secmult <= timeStamp)
                 {
                     post_yaw = imu_history[0].imu.yaw_angle;
-                    post_time = imu_history[0].stamp.toSec()*pow(10,6);
+                    post_time = imu_history[0].stamp.toSec()*secmult;
                     pre_yaw = imu_history[1].imu.yaw_angle;
-                    pre_time = imu_history[1].stamp.toSec()*pow(10,6);
+                    pre_time = imu_history[1].stamp.toSec()*secmult;
                 }
                 else
                 {
                     for(auto it=imu_history.begin(); it!=imu_history.end(); it++)
                     {
-                        if((it->stamp).toSec()*pow(10,6) >= timeStamp)
+                        if((it->stamp).toSec()*secmult >= timeStamp)
                         {
                             post_yaw = (*it).imu.yaw_angle;
-                            post_time = (*it).stamp.toSec()*pow(10,6);
+                            post_time = (*it).stamp.toSec()*secmult;
                         }
                         else
                         {
                             pre_yaw = (*it).imu.yaw_angle;
-                            pre_time = (*it).stamp.toSec()*pow(10,6);
+                            pre_time = (*it).stamp.toSec()*secmult;
                             break;
                         }
                     }
@@ -139,7 +140,7 @@ namespace armor
                 while(pred_yaw > M_PI) pred_yaw -= 2*M_PI;
                 while(pred_yaw < -M_PI) pred_yaw += 2*M_PI;
                 
-                int64_t last = imu_history[0].stamp.toSec()*pow(10,6);
+                int64_t last = imu_history[0].stamp.toSec()*secmult;
                 // std::cout<<"PRE YAW: "<<pre_yaw<<" , TIME: "<<pre_time<<"\n";
                 // std::cout<<"POST YAW: "<<post_yaw<<" , TIME: "<<post_time<<"\n";
                 // std::cout<<"k:"<<k<<std::endl;
@@ -160,26 +161,26 @@ namespace armor
                 {
                     return imu_history[0].imu.pitch_angle;
                 }
-                if((imu_history[0].stamp).toSec()*pow(10,6) <= timeStamp)
+                if((imu_history[0].stamp).toSec()*secmult <= timeStamp)
                 {
                     post_pitch = imu_history[0].imu.pitch_angle;
-                    post_time = imu_history[0].stamp.toSec()*pow(10,6);
+                    post_time = imu_history[0].stamp.toSec()*secmult;
                     pre_pitch = imu_history[1].imu.pitch_angle;
-                    pre_time = imu_history[1].stamp.toSec()*pow(10,6);
+                    pre_time = imu_history[1].stamp.toSec()*secmult;
                 }
                 else
                 {
                     for(auto it=imu_history.begin(); it!=imu_history.end(); it++)
                     {
-                        if((it->stamp).toSec()*pow(10,6) >= timeStamp)
+                        if((it->stamp).toSec()*secmult >= timeStamp)
                         {
                             post_pitch = (*it).imu.pitch_angle;
-                            post_time = (*it).stamp.toSec()*pow(10,6);
+                            post_time = (*it).stamp.toSec()*secmult;
                         }
                         else
                         {
                             pre_pitch = (*it).imu.pitch_angle;
-                            pre_time = (*it).stamp.toSec()*pow(10,6);
+                            pre_time = (*it).stamp.toSec()*secmult;
                             break;
                         }
                     }
@@ -295,21 +296,21 @@ namespace armor
             void update_pose(nav_msgs::Odometry&p,  nav_msgs::Odometry p1, nav_msgs::Odometry p2, const ros::Time& image_timeStamp)
             {
                 geometry_msgs::Pose pred_pose;
-                float k_x = (p1.pose.pose.position.x-p2.pose.pose.position.x) / (p1.header.stamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6));
-                float k_y = (p1.pose.pose.position.y-p2.pose.pose.position.y) / (p1.header.stamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6));
-                float k_z = (p1.pose.pose.position.z-p2.pose.pose.position.z) / (p1.header.stamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6));
-                float k_x1 = (p1.pose.pose.orientation.x-p2.pose.pose.orientation.x) / (p1.header.stamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6));
-                float k_y1 = (p1.pose.pose.orientation.y-p2.pose.pose.orientation.y) / (p1.header.stamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6));
-                float k_z1 = (p1.pose.pose.orientation.z-p2.pose.pose.orientation.z) / (p1.header.stamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6));
-                float k_w = (p1.pose.pose.orientation.w-p2.pose.pose.orientation.w) / (p1.header.stamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6));
+                float k_x = (p1.pose.pose.position.x-p2.pose.pose.position.x) / (p1.header.stamp.toSec()*secmult - p2.header.stamp.toSec()*secmult);
+                float k_y = (p1.pose.pose.position.y-p2.pose.pose.position.y) / (p1.header.stamp.toSec()*secmult - p2.header.stamp.toSec()*secmult);
+                float k_z = (p1.pose.pose.position.z-p2.pose.pose.position.z) / (p1.header.stamp.toSec()*secmult - p2.header.stamp.toSec()*secmult);
+                float k_x1 = (p1.pose.pose.orientation.x-p2.pose.pose.orientation.x) / (p1.header.stamp.toSec()*secmult - p2.header.stamp.toSec()*secmult);
+                float k_y1 = (p1.pose.pose.orientation.y-p2.pose.pose.orientation.y) / (p1.header.stamp.toSec()*secmult - p2.header.stamp.toSec()*secmult);
+                float k_z1 = (p1.pose.pose.orientation.z-p2.pose.pose.orientation.z) / (p1.header.stamp.toSec()*secmult - p2.header.stamp.toSec()*secmult);
+                float k_w = (p1.pose.pose.orientation.w-p2.pose.pose.orientation.w) / (p1.header.stamp.toSec()*secmult - p2.header.stamp.toSec()*secmult);
                 
-                pred_pose.position.x = p2.pose.pose.position.x + (image_timeStamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6))*k_x;
-                pred_pose.position.y = p2.pose.pose.position.y + (image_timeStamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6))*k_y;
-                pred_pose.position.z = p2.pose.pose.position.z + (image_timeStamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6))*k_z;
-                pred_pose.orientation.x = p2.pose.pose.orientation.x + (image_timeStamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6))*k_x1;
-                pred_pose.orientation.y = p2.pose.pose.orientation.y + (image_timeStamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6))*k_y1;
-                pred_pose.orientation.z = p2.pose.pose.orientation.z + (image_timeStamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6))*k_z1;
-                pred_pose.orientation.w = p2.pose.pose.orientation.w + (image_timeStamp.toSec()*pow(10,6) - p2.header.stamp.toSec()*pow(10,6))*k_w;
+                pred_pose.position.x = p2.pose.pose.position.x + (image_timeStamp.toSec()*secmult - p2.header.stamp.toSec()*secmult)*k_x;
+                pred_pose.position.y = p2.pose.pose.position.y + (image_timeStamp.toSec()*secmult - p2.header.stamp.toSec()*secmult)*k_y;
+                pred_pose.position.z = p2.pose.pose.position.z + (image_timeStamp.toSec()*secmult - p2.header.stamp.toSec()*secmult)*k_z;
+                pred_pose.orientation.x = p2.pose.pose.orientation.x + (image_timeStamp.toSec()*secmult - p2.header.stamp.toSec()*secmult)*k_x1;
+                pred_pose.orientation.y = p2.pose.pose.orientation.y + (image_timeStamp.toSec()*secmult - p2.header.stamp.toSec()*secmult)*k_y1;
+                pred_pose.orientation.z = p2.pose.pose.orientation.z + (image_timeStamp.toSec()*secmult - p2.header.stamp.toSec()*secmult)*k_z1;
+                pred_pose.orientation.w = p2.pose.pose.orientation.w + (image_timeStamp.toSec()*secmult - p2.header.stamp.toSec()*secmult)*k_w;
 
                 p.pose.pose = pred_pose;
 
@@ -323,19 +324,19 @@ namespace armor
             void update_twist(nav_msgs::Odometry&t,  nav_msgs::Odometry t1, nav_msgs::Odometry t2, const ros::Time& image_timeStamp)
             {
                 geometry_msgs::Twist pred_twist;
-                float kl_x = (t1.twist.twist.linear.x - t2.twist.twist.linear.x) / (t1.header.stamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6));
-                float kl_y = (t1.twist.twist.linear.y - t2.twist.twist.linear.y) / (t1.header.stamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6));
-                float kl_z = (t1.twist.twist.linear.z - t2.twist.twist.linear.z) / (t1.header.stamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6));
-                float ka_x = (t1.twist.twist.angular.x - t2.twist.twist.angular.x) / (t1.header.stamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6));
-                float ka_y = (t1.twist.twist.angular.y - t2.twist.twist.angular.y) / (t1.header.stamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6));
-                float ka_z = (t1.twist.twist.angular.z - t2.twist.twist.angular.z) / (t1.header.stamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6));
+                float kl_x = (t1.twist.twist.linear.x - t2.twist.twist.linear.x) / (t1.header.stamp.toSec()*secmult - t2.header.stamp.toSec()*secmult);
+                float kl_y = (t1.twist.twist.linear.y - t2.twist.twist.linear.y) / (t1.header.stamp.toSec()*secmult - t2.header.stamp.toSec()*secmult);
+                float kl_z = (t1.twist.twist.linear.z - t2.twist.twist.linear.z) / (t1.header.stamp.toSec()*secmult - t2.header.stamp.toSec()*secmult);
+                float ka_x = (t1.twist.twist.angular.x - t2.twist.twist.angular.x) / (t1.header.stamp.toSec()*secmult - t2.header.stamp.toSec()*secmult);
+                float ka_y = (t1.twist.twist.angular.y - t2.twist.twist.angular.y) / (t1.header.stamp.toSec()*secmult - t2.header.stamp.toSec()*secmult);
+                float ka_z = (t1.twist.twist.angular.z - t2.twist.twist.angular.z) / (t1.header.stamp.toSec()*secmult - t2.header.stamp.toSec()*secmult);
 
-                pred_twist.linear.x = t2.twist.twist.linear.x + (image_timeStamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6))*kl_x;
-                pred_twist.linear.y = t2.twist.twist.linear.y + (image_timeStamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6))*kl_y;
-                pred_twist.linear.z = t2.twist.twist.linear.z + (image_timeStamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6))*kl_z;
-                pred_twist.angular.x = t2.twist.twist.angular.x + (image_timeStamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6))*ka_x;
-                pred_twist.angular.y = t2.twist.twist.angular.y + (image_timeStamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6))*ka_y;
-                pred_twist.angular.z = t2.twist.twist.angular.z + (image_timeStamp.toSec()*pow(10,6) - t2.header.stamp.toSec()*pow(10,6))*ka_z;
+                pred_twist.linear.x = t2.twist.twist.linear.x + (image_timeStamp.toSec()*secmult - t2.header.stamp.toSec()*secmult)*kl_x;
+                pred_twist.linear.y = t2.twist.twist.linear.y + (image_timeStamp.toSec()*secmult - t2.header.stamp.toSec()*secmult)*kl_y;
+                pred_twist.linear.z = t2.twist.twist.linear.z + (image_timeStamp.toSec()*secmult - t2.header.stamp.toSec()*secmult)*kl_z;
+                pred_twist.angular.x = t2.twist.twist.angular.x + (image_timeStamp.toSec()*secmult - t2.header.stamp.toSec()*secmult)*ka_x;
+                pred_twist.angular.y = t2.twist.twist.angular.y + (image_timeStamp.toSec()*secmult - t2.header.stamp.toSec()*secmult)*ka_y;
+                pred_twist.angular.z = t2.twist.twist.angular.z + (image_timeStamp.toSec()*secmult - t2.header.stamp.toSec()*secmult)*ka_z;
 
                 t.twist.twist = pred_twist;
                 for(int i=0; i<36; i++)
@@ -516,7 +517,8 @@ namespace armor
                 //std::cout << "Top:" << _light.topPt.x << ", " <<_light.topPt.y << std::endl;
                 //std::cout << "Bottom" << _light.bottomPt.x << ", " << _light.bottomPt.y << std::endl;
                 _light.centerPt = rRect.center;             //中心点
-                //std::cout << rRect.center.x << ", " << rRect.center.y << std::endl;
+                if(rRect.center.y + m_startPt.y < 200)  continue; 
+                std::cout << rRect.center.x << ", " << rRect.center.y + m_startPt.y << std::endl;
                 _light.length = cv::norm(bottomPt - topPt); //长度
                  /* 判断长度和倾斜角是否合乎要求 */
                 if (_light.length < 3.0 || 800.0 < _light.length || cv::abs(_light.angle - 90) > 30.0)
@@ -1011,7 +1013,7 @@ namespace armor
             /* 1.初始化参数，判断是否启用ROI */
             m_bgr_raw = src;
             m_bgr = src;
-            int64_t timeStamp = image_timeStamp.toSec()*pow(10,6);
+            int64_t timeStamp = image_timeStamp.toSec()*secmult;
             m_currentTimeStamp = timeStamp;
             m_targets.clear();      //m_targets只储存本次监测到的对象，因为每调用一次，就会清零
             m_preTargets.clear();
@@ -1022,7 +1024,7 @@ namespace armor
                 getBoundingRect(s_historyTargets[0], latestShootRect, stFrameInfo.size, true);
                 m_is.addEvent("Bounding Rect", latestShootRect);
                 m_bgr = m_bgr(latestShootRect);
-                m_startPt = latestShootRect.tl();
+                m_startPt = latestShootRect.tl(); //tl返回左上角顶点的坐标
                 // cv::namedWindow("m_bgr");
                 // cv::imshow("m_bgr",m_bgr);
                 // cv::waitKey(5);
@@ -1177,7 +1179,7 @@ namespace armor
                     mycar.pose.pose.position.y=s_historyTargets[0].ptsInWorld.y;
                     mycar.pose.pose.position.z=s_historyTargets[0].ptsInWorld.z;
                     mycar.id = s_historyTargets[0].id;
-                    mycar.color = mode;    //红蓝模式,yaml文件中读出
+                    mycar.color = mode+1;    //红蓝模式,yaml文件中读出
                     temp.emplace_back(mycar);
                     //先检查本次target中有无与已瞄id不同的id
                     Target* minother = nullptr;
