@@ -770,11 +770,11 @@ namespace armor
                 // Argmax: Get Final Prediction Label and Probability
                 int output_class_id = -1;
                 double output_prob = -1;
-                //std::cout << "---------------------------------------------" << endl;
-                //std::cout << i << ":" << std::endl;
+                std::cout << "---------------------------------------------" << endl;
+                std::cout << i << ":" << std::endl;
                 for (int j = 0; j < output_dim; j++)
                 {
-                    //std::cout << "Class " << j << " prob:" << tmap(0, j) << "," << std::endl;
+                    std::cout << "Class " << j << " prob:" << tmap(0, j) << "," << std::endl;
                     if (tmap(i, j) >= output_prob) {
                         output_class_id = j;
                         output_prob = tmap(i, j);
@@ -1214,7 +1214,6 @@ namespace armor
                 vision_data.if_shoot = false;
                 vision_data.if_enemy = false;
                 last_vision_data = vision_data;
-                std::cout<<"LOSS"<<std::endl;
             }
             sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
             resultPub.publish(*msg);
