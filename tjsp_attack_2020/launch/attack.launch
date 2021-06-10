@@ -1,0 +1,7 @@
+<launch>
+
+  <node pkg="tjsp_attack_2020" type="armorAttack" name="armorAttack" output="screen" respawn="true" />
+
+  <node pkg="tjsp_attack_2020" type="img_server.py" name="img_server" />
+
+</launch>
