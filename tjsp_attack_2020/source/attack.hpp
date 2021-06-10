@@ -82,6 +82,7 @@ namespace armor
     std::deque<Target> AttackBase::s_historyTargets;
     Kalman AttackBase::kalman;
 
+    //利用一阶运动模型对IMU进行补偿，减小误差
     class IMUBuff
     {
         public:
@@ -197,6 +198,7 @@ namespace armor
             }
     };
 
+    //利用一阶运动模型对Odom进行传感器对齐
     class OdomBuff
     {
         public:
@@ -799,7 +801,8 @@ namespace armor
             for (auto iter = s_historyTargets.begin(); iter != s_historyTargets.end(); iter++)
             {
                 iter->rTick++;
-                /* 历史值数量大于30便删除末尾记录 (似乎是大于5就删除？？？）*/
+                /* 历史值数量大于30便删除末尾记录
+                装甲板在被击打时会有短暂的一个时间不发光无法识别需要在不发光时保证瞄准状态不改变，数值/fps应在0.15s以上*/
                 if (iter->rTick > 20)
                 {
                     s_historyTargets.erase(iter, s_historyTargets.end());
@@ -842,7 +845,8 @@ namespace armor
                     cv::Moments m_1 = cv::moments(m_targets[i].pixelPts2f);
                     cv::Moments m_2 = cv::moments(s_historyTargets[0].pixelPts2f);   
                     // PRINT_WARN("distanceA = %f\n", distanceA);
-                    /* 进行matchShaoes的阈值限定，并保证归一化中心矩同号 */ 
+                    /* 进行matchShaoes的阈值限定，并保证归一化中心矩同号
+                    加了这一块有时候会把装甲板过滤掉，我也没整明白图像矩的原理，所以删掉了 */ 
                     // if (distanceA > 0.5 ||
                     //     (m_1.nu11 + m_1.nu30 + m_1.nu12) * (m_2.nu11 + m_2.nu30 + m_2.nu12) < 0)
                     //     continue;
@@ -934,6 +938,7 @@ namespace armor
                 // rect.height = rect.y + rect.height >= size.height ? size.height - 1 - rect.y : rect.height;
 
                 int temp=rect.y;
+                //因为ICRA比赛机器人只在水平面内运行，所以只检测图像下半部分
                 rect.y =rect.y>210?rect.y:210;
                 rect.height=rect_yy-rect.y;
                 rect.height = rect.y + rect.height >= size.height ? size.height - 1 - rect.y : rect.height;
@@ -942,6 +947,7 @@ namespace armor
 
         void gimbal_excute(ros::Publisher& gimbalPub,double pitch,double yaw)
         {
+            //云台执行函数，已经弃用，云台控制统一由决策节点完成
             roborts_msgs::GimbalAngle gimbalAngle;
             gimbalAngle.yaw_mode = 1;
             gimbalAngle.pitch_mode = 0;
@@ -950,6 +956,7 @@ namespace armor
             gimbalPub.publish(gimbalAngle);
         }
 
+        //获取机器人云台和底盘夹角
         void get_gimbal(double& pitch,double& yaw)
         {
             
@@ -958,7 +965,7 @@ namespace armor
             listener->lookupTransform("/base_link", "/gimbal",
                                     ros::Time(0), transform);
             double roll;
-
+            //四元数转欧拉角
             tf::Matrix3x3(transform.getRotation()).getRPY(roll,pitch,yaw);
             yaw = yaw/3.14159265*180.0;
             pitch = pitch/3.14159265*180.0;
@@ -978,6 +985,7 @@ namespace armor
         // std::cout<<"roll:"<<roll<<"   "<<"pitch:"<<pitch<<"yaw:"<<yaw<<std::endl;
     }
 
+    //卡尔曼滤波切换目标条件
     bool ChangeCondition(std::deque<Target>& targets)
     {
         if(targets.size()<2)
@@ -985,7 +993,7 @@ namespace armor
             return true;
         }
         else
-        {
+        {   //在两次装甲板的夹角大于pi/4时证明瞄准的不是同一块装甲板而是机器人旋转漏出了另一块装甲板
             if(cv::abs(targets[0].relativeYaw - targets[1].relativeYaw)>M_PI/4)
             {
                 return true;
@@ -1013,7 +1021,7 @@ namespace armor
             /* 1.初始化参数，判断是否启用ROI */
             m_bgr_raw = src;
             m_bgr = src;
-            int64_t timeStamp = image_timeStamp.toSec()*secmult;
+            int64_t timeStamp = image_timeStamp.toSec()*secmult;   //时间戳是机器人采集到图像时生成的时间戳
             m_currentTimeStamp = timeStamp;
             m_targets.clear();      //m_targets只储存本次监测到的对象，因为每调用一次，就会清零
             m_preTargets.clear();
@@ -1082,12 +1090,15 @@ namespace armor
                         if (s_historyTargets.size() == 1||ChangeCondition(s_historyTargets))
                         {
                             std::cout<<"RESET"<<std::endl;
+                            /*由于在扭腰的时候机器人的底盘坐标系一直在变化，所以如果想要做卡尔曼滤波需要保证将所有的目标统一到一个坐标系之下
+                            因此将卡尔曼滤波初始化时候的坐标系设为稳定的坐标系，其他每一时刻的观测结果都转换到这个坐标系下*/
                             odom_buff->reset_standard();
                             odom_buff->pose_judge(s_historyTargets[0].ptsInWorld, image_timeStamp);
                             kalman.clear_and_init(s_historyTargets[0].ptsInWorld, timeStamp);
                         }
                         else
                         {
+                            
                             odom_buff->pose_judge(s_historyTargets[0].ptsInWorld, image_timeStamp);
                             kalman.correct(s_historyTargets[0].ptsInWorld, timeStamp);
                         }
@@ -1101,31 +1112,26 @@ namespace armor
                     if (s_historyTargets.size() > 1)
                     {
                         kalman.predict(0.1, s_historyTargets[0].ptsInWorld_Predict);
+                        //得到了预测结果之后将坐标再转换回原来的坐标系
                         odom_buff->transback(s_historyTargets[0].ptsInWorld_Predict);
                         odom_buff->transback(kalman.velocity);
                         /* 转换为云台坐标点 */
                         s_historyTargets[0].convert2GimbalPts(kalman.velocity);
+                        //不知道神奇的卡尔曼滤波输出的速度单位是分米/s，所以需要做转换
                         double vx = s_historyTargets[0].vInGimbal3d.x*100;   //mm/s
                         m_is.addText(cv::format("vx %4.0f", s_historyTargets[0].vInGimbal3d.x*100));
                         m_is.addText(cv::format("vy %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.y*100)));
                         m_is.addText(cv::format("vz %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.z*100)));
-                        if (cv::abs(s_historyTargets[0].vInGimbal3d.x) > 6)   //0.3m/s
+                        if (cv::abs(s_historyTargets[0].vInGimbal3d.x) > 6)   //0.6m/s
                         {
+                            //0.1s好像是不太够，ICRA2020的车在值为0.2的时候能对移动目标进行比较稳定的打击
                             double deltaX = vx*0.1;    //dm/s->mm/s->m(delay=0.1)
-                            // double deltaX = cv::abs(13 * cv::abs(s_historyTargets[0].vInGimbal3d.x) *
-                            //                         s_historyTargets[0].ptsInGimbal.z / 3000);
                             deltaX = deltaX > 200 ? 200 : deltaX;
                             s_historyTargets[0].ptsInGimbal.x += deltaX;
 
-                            // s_historyTargets[0].ptsInGimbal.x +=
-                            //     1*deltaX * cv::abs(s_historyTargets[0].vInGimbal3d.x) /
-                            //     s_historyTargets[0].vInGimbal3d.x;
                         }
                     }
                 }
-                // ros::Time now2=ros::Time::now();
-                // std::cout<<"yuce"<<" "<<now2-pretime2<<"  ";
-                // std::cout<<std::endl;
 
                 if(statusA == SEND_STATUS_AUTO_AIM)
                 {
@@ -1144,7 +1150,7 @@ namespace armor
                     if (s_historyTargets.size() >= 3 &&
                         cv::abs(s_historyTargets[0].ptsInGimbal.x) < 100.0)
                     {
-                        vision_data.if_shoot=true;
+                        vision_data.if_shoot=true;   //因为相机固定在yaw轴上，因此仅考虑x方向的瞄准情况
                     }
                     m_is.addText(cv::format("ptsInGimbal: %2.3f %2.3f %2.3f",
                                                     s_historyTargets[0].ptsInGimbal.x / 1000.0,
@@ -1157,6 +1163,8 @@ namespace armor
 
                     rYaw=rYaw* M_PI / (180.0);
                     gYaw=gYaw* M_PI / (180.0);
+
+                    //在获取绝对角度的时候应该考虑的是采集图像那一刻机器云台所处的角度，因此需要回看
                     double gYaw_pred = imu_buff->getPredYaw(timeStamp);
                     double latestYaw = imu_buff->getLatestYaw();
                     float send_Yaw =gYaw_pred+rYaw;
@@ -1167,7 +1175,7 @@ namespace armor
                     vision_data.G_angle.pitch_angle=rPitch;
                     std::vector<roborts_msgs::single_car> temp;
 
-                    roborts_msgs::single_car mycar;     //第一个，要射的
+                    roborts_msgs::single_car mycar;     //第一个目标要射的
                     mycar.pose.pose.orientation.x=0;
                     mycar.pose.pose.orientation.y=0;
                     mycar.pose.pose.orientation.z=0;
@@ -1206,7 +1214,7 @@ namespace armor
                     last_vision_data = vision_data;
                  }
                  else{
-                     //  for 5 frames keep last feedback
+                     // 在一个时间段内保持之前的打击状态
                  }
             }
             else{
@@ -1215,6 +1223,8 @@ namespace armor
                 vision_data.if_enemy = false;
                 last_vision_data = vision_data;
             }
+
+            //把图像发出来
             sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "rgb8", m_is.getFrame()).toImageMsg();
             resultPub.publish(*msg);
             messpub.publish(last_vision_data);

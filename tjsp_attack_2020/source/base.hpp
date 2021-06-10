@@ -167,6 +167,7 @@ namespace armor
             isTest = stConfig.get<bool>("curve.test-shoot");
         }
 
+        //设置相机内参
         void SetCameraInfo(const boost::array<double,9>& camera_matrix,const std::vector<double>& distortion_coefficients)
         {
 
@@ -453,6 +454,8 @@ namespace armor
             ptsInGimbal_Predict.y = ptsInGimbal_PredictMat.at<double>(1);
             ptsInGimbal_Predict.z = ptsInGimbal_PredictMat.at<double>(2);
         }
+
+        //弹道模型，计算方法参见https://github.com/RoboMaster/RoboRTS-Tutorial/tree/master/pdf
         #define GRAVITY 9.81
         float BulletModel(float x, float v, float angle) { //x:m,v:m/s,angle:rad
             float t, y;
