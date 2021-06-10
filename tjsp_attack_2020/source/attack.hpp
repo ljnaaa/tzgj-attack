@@ -800,7 +800,7 @@ namespace armor
             {
                 iter->rTick++;
                 /* 历史值数量大于30便删除末尾记录 (似乎是大于5就删除？？？）*/
-                if (iter->rTick > 10)
+                if (iter->rTick > 20)
                 {
                     s_historyTargets.erase(iter, s_historyTargets.end());
                     break;
@@ -1111,7 +1111,7 @@ namespace armor
                         m_is.addText(cv::format("vz %4.0f", cv::abs(s_historyTargets[0].vInGimbal3d.z*100)));
                         if (cv::abs(s_historyTargets[0].vInGimbal3d.x) > 6)   //0.3m/s
                         {
-                            double deltaX = vx*0.2;    //dm/s->mm/s->m(delay=0.1)
+                            double deltaX = vx*0.1;    //dm/s->mm/s->m(delay=0.1)
                             // double deltaX = cv::abs(13 * cv::abs(s_historyTargets[0].vInGimbal3d.x) *
                             //                         s_historyTargets[0].ptsInGimbal.z / 3000);
                             deltaX = deltaX > 200 ? 200 : deltaX;
